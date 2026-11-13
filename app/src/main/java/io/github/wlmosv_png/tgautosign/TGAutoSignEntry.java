@@ -176,6 +176,17 @@ public final class TGAutoSignEntry extends XposedModule {
         }
         CORE.start();
         installBusinessHooks();
+        // 启动后主动推一次目标快照：跨应用广播在部分机型/版本上收不到，
+        // 这里不依赖广播，等 UI 线程空下来再写。
+        try {
+            final TGAutoSignCore coreRef = CORE;
+            new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(() -> {
+                try {
+                    coreRef.pushTargetsToWidget();
+                    logInfo("启动后已推送目标快照");
+                } catch (Throwable t) { logError("启动推送目标快照失败", t); }
+            }, 3000L);
+        } catch (Throwable ignored) {}
         // 2026-11-08（1.7.6 修）：观察链路健康标记必须在**装完 Hook 之后**判定。
         // 1.7.5 把它放在 CORE.start() 之后，那时 anchorA/BHooked 还是 false →
         //   标记永远不置位 → 所有待处理目标都被显示成"链路不健康"（真机截图实测）。
