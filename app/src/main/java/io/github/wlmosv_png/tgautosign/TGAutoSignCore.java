@@ -3842,6 +3842,7 @@ public final class TGAutoSignCore {
                     android.net.Uri.parse("content://io.github.wlmosv_png.tgautosign.settings"),
                     "sync_targets", null, b);
         } catch (Throwable t) {
+            android.util.Log.e("TGAutoSignCore", "pushTargetsToWidget 失败: " + t, t);
             try { noteSwallowed("pushTargetsToWidget", t); } catch (Throwable ignored) {}
         }
     }
