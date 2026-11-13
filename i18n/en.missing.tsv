@@ -1,0 +1,105 @@
+# 待翻译（补上 TAB 后的英文即可）
+\n确定删除？（会跨所有账号清干净）	\nDelete? (clears it across all accounts)
+ 使用教程	 Guide
+Telegram 标志类：{0}	Telegram flag classes: {0}
+{0}  ·  约 {1} 分钟后	{0}  ·  in ~{1} min
+{0} 个目标	{0} targets
+{0} 个账号	{0} accounts
+{0} 出品	Made by {0}
+{0}（失败 {1} 次）	{0} (failed {1}×)
+{0}（待签）	{0} (pending)
+{0}（明日）	{0} (tomorrow)
+{0}：{1}	{0}: {1}
+{0}：目标 {1} · 已签 {2}	{0}: {1} targets · {2} signed
+⚠️ TGAutoSign 今日 {0}/{1} 已签，{2} 个未完成	⚠️ TGAutoSign — {0}/{1} signed today, {2} incomplete
+⚠️ {0} 已连续 {1} 天签到失败\n原因: {2}\n账号: {3}	⚠️ {0} failed {1} days in a row\nReason: {2}\nAccount: {3}
+⚠️ {0} 连续 {1} 天签到失败	⚠️ {0} failed {1} days in a row
+✅ TGAutoSign 今日签到完成 {0}/{1}	✅ TGAutoSign — {0}/{1} signed today
+✅ 签到完成 {0} 个	✅ Signed {0}
+三项齐全	all three present
+下载 v{0} 安装包	Download v{0}
+不含学习关键词	no learning keyword
+全账号签到\n{0}	All-account signing\n{0}
+全部签到（{0} 个条目）	Sign all ({0} items)
+分享 TGAutoSign	Share TGAutoSign
+命中「排除的 bot」({0})	Blocked bot ({0})
+命中排除规则「{0}」	Matched block rule "{0}"
+宿主包 {0}	Host package {0}
+已填入: {0}	Filled in: {0}
+当前账号：{0}（共登录 {1} 个）	Current account: {0} ({1} signed in)
+待确认（{0}）	Pending ({0})
+未知	unknown
+没有匹配「{0}」的日志	No logs matching "{0}"
+目标列表（{0}）	Targets ({0})
+目标：{0}	Target: {0}
+目标：全部	Target: all
+确认框失败: {0}	Confirm dialog failed: {0}
+签到完成 {0} 个，{1} 个没成功（/jmb → 📄 运行日志 里有原因）	Signed {0}, {1} failed (see /jmb → 📄 Logs for reasons)
+缺 {0}（该客户端自研了这层，模块不注入也不误伤）	missing {0} (this client rolled its own layer — module neither injects nor interferes)
+群 {0}	Group {0}
+账号一览（{0}）	Accounts ({0})
+还没有签到目标，切过去学一个	no targets yet — switch over and learn one
+（还没有目标，去该账号学一个）	 (no targets yet — switch over and learn one)
+判定为成功的附加词（逗号分隔）	Extra words meaning SUCCESS (comma separated)
+判定为失败的附加词（逗号分隔）	Extra words meaning FAILURE (comma separated)
+判断 bot 回复成功/失败用的词。内置了一批常见词；认不出来的回复会记进诊断包，\n见到「未识别回复」就在这加上对应措辞即可。	Words used to tell whether the bot reply means success or failure. Common ones are built in; unrecognized replies are recorded in the diagnostics package — when you see one, add its wording here.
+(没读到按钮，请在 bot 里点一下签到按钮再试)	(No buttons found — tap the bot's check-in button first)
+完成	Done
+自动识别（推荐）	Auto-detect (recommended)
+去 bot 会话点一下它的签到按钮，会自动记忆并每天跟进	Tap its check-in button in the bot chat; it will be remembered and followed daily
+我有签到指令	I have a check-in command
+知道它要求的文本指令（bot ID + 指令）	I know the text command it expects (bot ID + command)
+群 / 频道签到	Group / channel check-in
+在群聊里发签到指令（不是私聊）	Send the check-in command in a group chat (not a private chat)
+(暂无可调试按钮：先在目标 bot 会话里点一次它的签到按钮)	(No buttons to debug yet — tap the target bot's check-in button first)
+ 请在 Telegram 界面使用 /jmb	 Please use /jmb inside Telegram
+ 多账号用户的省事入口：把当前账号的目标整体复制给其它账号，不用一条条重新添加。入口在「全部功能 → 目标」里。	 The easy path for multi-account users: copy this account's targets to another account in one go instead of re-adding them one by one. Find it under "All features → Targets".
+如: 领取完毕,今日完成	e.g. claimed, completed today
+如: 次数已用完,不可领取	e.g. out of attempts, not claimable
+请在 Telegram 界面使用 /jmb	Please use /jmb inside Telegram
+多账号用户的省事入口：把当前账号的目标整体复制给其它账号，不用一条条重新添加。入口在「全部功能 → 目标」里。	The easy path for multi-account users: copy this account's targets to another account in one go instead of re-adding them one by one. Find it under "All features → Targets".
+✅ TGAutoSign 今日签到完成 	✅ TGAutoSign — today's check-in complete 
+✅ TGAutoSign 今日签到完成 {0}	✅ TGAutoSign — today's check-in complete ({0})
+（窗口外·省电）	(outside window · saving power)
+（窗口内·已签完）	(inside window · all signed)
+（窗口内·有未签）	(inside window · pending)
+  间隔=	  interval=
+待确认	Unconfirmed
+已发出但 bot 始终没回复：{0} 标记为「待确认」（不计成功也不计失败，已停止自动重试；想再试可手动点一次）	Sent but the bot never replied: {0} marked "unconfirmed" (not counted as success or failure; auto-retry stopped — retry manually if you like)
+判定机器人回复	Judging bot replies
+自动判定成功 / 失败	Auto-detect success / failure
+开着：按内置词表判断机器人回复是成功还是失败。\n关掉：只记录回复、不判成败（目标需要你自己确认）。	On: uses the built-in word list to decide whether a reply means success or failure.\nOff: replies are only logged, never judged — you confirm targets yourself.
+使用我的自定义词（叠加在内置之上）	Use my own words (on top of the built-ins)
+捕获目标	Capture target
+自动判定已关闭：机器人回复不会被判成败（设置 → 判定机器人回复）	Auto-detection is off: bot replies won't be judged (Settings → Judging bot replies)
+宽松模式（来者不拒）	Loose mode (accept anything)
+开：点什么学什么（不再按关键词过滤）；判定时**只要机器人有回复就算成功**，\n但命中明确失败词（活动已结束 / 请先关注 / 未绑定 等）仍判失败。\n适合判定词千奇百怪的机器人。关：完全按下面的规则判定。	On: learn whatever you tap (no keyword filter), and **treat any reply as success** when judging — except replies that clearly mean failure (event ended / follow first / not linked, etc.), which still fail.\nFor bots with unpredictable wording. Off: judge purely by the rules below.
+确认已签	Confirm signed
+重试	Retry
+忽略今天	Skip today
+已记为今日已签	Marked as signed today
+已重新发送	Resent
+已忽略今天	Skipped today
+没等到 bot 回复：	No reply from the bot:
+目标已不存在	This target no longer exists
+待确认：确认已签	Pending: confirm signed
+待确认：重试一次	Pending: retry once
+待确认：忽略今天	Pending: skip today
+── 多账号串号排查 ──	── Multi-account ID mixup check ──
+模拟已关	Simulation off
+模拟已开：解析为 {0}	Simulation on: parsed as {0}
+模拟生效：{0} 个账号 → 解析 {1}（acc{2}_，目标 {3} 个）	Simulation active: {0} accounts -> parsed {1} (acc{2}_, {3} targets)
+真实读取：selectedAccount={0} → {1}	Actual read: selectedAccount={0} -> {1}
+越界模拟（强制 selectedAccount = 已登录数）	Overflow simulation (force selectedAccount = logged-in count)
+「{0}」今天已经签过了	"{0}" is already signed today
+「{0}」正在签到中，请稍候	"{0}" is signing, please wait
+「{0}」已发出、正在等结果	"{0}" sent; waiting for the result
+「{0}」今日重试次数已用完	"{0}" has used up today's retries
+「{0}」失败退避中，稍后自动重试	"{0}" is backing off after failure; will retry later
+「{0}」已停用 / 暂停 / 冻结	"{0}" is disabled / paused / frozen
+「{0}」发送失败：取不到会话数据，先进该会话发一条消息	"{0}" send failed: cannot read the chat data; send a message there first
+已发出	Sent
+已对全部启用账号发起签到，结果见日志	Sign-in started for all enabled accounts; see the log
+已对 {0} 个目标发起签到，结果见运行日志	Sign-in started for {0} targets; see the run log
+没有可签的目标（都签过了 / 暂停 / 冻结）	No targets to sign (all signed / paused / frozen)
+设置保存失败：写盘出错，请检查存储空间	Failed to save settings: disk write error; check storage space

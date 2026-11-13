@@ -1,0 +1,23 @@
+*.iml
+.gradle/
+build/
+app/build/
+local.properties
+.idea/
+.DS_Store
+
+# 签名材料，绝不入库
+keystore/
+*.jks
+*.keystore
+*.p12
+
+# 本地编译校验产物
+verify/
+
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 本地备份（含 .bak3-… 这类带后缀的临时副本）
+*.bak*
