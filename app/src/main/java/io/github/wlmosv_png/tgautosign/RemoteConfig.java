@@ -21,6 +21,8 @@ import java.util.Map;
 public final class RemoteConfig {
 
     public static final String ACTION_CHANGED = "io.github.wlmosv_png.tgautosign.SETTINGS_CHANGED";
+    /** 独立界面请求目标快照。 */
+    public static final String ACTION_REQUEST_TARGETS = "io.github.wlmosv_png.tgautosign.REQUEST_TARGETS";
     private static final Uri URI = Uri.parse("content://" + MiuiSettingsProvider.AUTHORITY + "/settings");
 
     private static final Map<String, Object> CACHE = new HashMap<>();

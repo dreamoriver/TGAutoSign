@@ -3803,6 +3803,47 @@ public final class TGAutoSignCore {
         } catch (Throwable ignored) {}
     }
 
+    /**
+     * 把当前账号的目标快照推给独立界面（方案二延伸）。
+     *
+     * 目标数据只在 Telegram 进程里，模块自己的界面读不到；这里由宿主侧主动
+     * 推一份只读快照过去，失败完全不影响签到流程。
+     */
+    public void pushTargetsToWidget() {
+        try {
+            final String pfx = accountPrefix();
+            final String today = DateUtils.today();
+            org.json.JSONArray arr = new org.json.JSONArray();
+            for (Map<String, Object> m : targetsSnapshot()) {
+                Object idObj = m.get("id");
+                if (idObj == null) continue;
+                String id = String.valueOf(idObj);
+                String did = String.valueOf(m.get("did"));
+                org.json.JSONObject o = new org.json.JSONObject();
+                o.put("id", id);
+                o.put("did", did);
+                o.put("cmd", String.valueOf(m.get("text")));
+                String title;
+                try { title = targetTitle(did); } catch (Throwable t) { title = String.valueOf(m.get("text")); }
+                o.put("title", title);
+                o.put("signed", today.equals(store.s(Keys.last(pfx, id))));
+                o.put("signedAt", store.l(Keys.signedAt(pfx, id), 0L));
+                o.put("pending", !store.s(Keys.pendingCfm(pfx, id)).isEmpty());
+                o.put("note", store.s(Keys.pendingResult(pfx, id)));
+                arr.put(o);
+            }
+            android.os.Bundle b = new android.os.Bundle();
+            b.putString("json", arr.toString());
+            b.putString("account", String.valueOf(currentAccount()));
+            b.putLong("at", System.currentTimeMillis());
+            appContext.getContentResolver().call(
+                    android.net.Uri.parse("content://io.github.wlmosv_png.tgautosign.settings"),
+                    "sync_targets", null, b);
+        } catch (Throwable t) {
+            try { noteSwallowed("pushTargetsToWidget", t); } catch (Throwable ignored) {}
+        }
+    }
+
     private List<Map<String, Object>> targetsSnapshot() {
         synchronized (TLOCK) { return new ArrayList<Map<String, Object>>(targets); }
     }

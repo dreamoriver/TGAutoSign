@@ -74,7 +74,8 @@ public class SettingsHomeActivity extends Activity {
         switchRow("只通知失败", "成功的不打扰", Keys.notifyFailOnly(), defaultBool("jmb_notify_fail_only", false));
         section("关于");
         valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
-        valueRow("目标管理", "在 Telegram 里发 /jmb 打开", "打开 ›", v -> openTelegram());
+        valueRow("签到目标", "查看每个目标的今日状态", "›", v ->
+                startActivity(new Intent(SettingsHomeActivity.this, TargetsActivity.class)));
     }
 
     // ───────── 行构建 ─────────

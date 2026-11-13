@@ -138,10 +138,21 @@ public final class TGAutoSignEntry extends XposedModule {
         // 拉不到就继续用 Telegram 本地 prefs，行为与升级前一致。
         try {
             RemoteConfig.refresh(appContext);
-            android.content.IntentFilter filter =
-                    new android.content.IntentFilter(RemoteConfig.ACTION_CHANGED);
+            android.content.IntentFilter filter = new android.content.IntentFilter();
+            filter.addAction(RemoteConfig.ACTION_CHANGED);
+            filter.addAction(RemoteConfig.ACTION_REQUEST_TARGETS);
             android.content.BroadcastReceiver receiver = new android.content.BroadcastReceiver() {
                 @Override public void onReceive(Context c, android.content.Intent intent) {
+                    String action = intent == null ? null : intent.getAction();
+                    if (RemoteConfig.ACTION_REQUEST_TARGETS.equals(action)) {
+                        try {
+                            if (CORE != null) {
+                                CORE.pushTargetsToWidget();
+                                logInfo("已推送目标快照给独立界面");
+                            }
+                        } catch (Throwable t) { logError("推送目标快照失败", t); }
+                        return;
+                    }
                     RemoteConfig.invalidate(c);
                     logInfo("设置已从独立界面更新");
                 }

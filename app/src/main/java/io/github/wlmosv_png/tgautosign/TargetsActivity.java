@@ -1,0 +1,195 @@
+package io.github.wlmosv_png.tgautosign;
+
+import android.app.Activity;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+/**
+ * 目标列表（只读快照）。
+ *
+ * 数据在 Telegram 进程里，这边只能通过在页面打开时请求一次快照来展示：
+ * 发 REQUEST_TARGETS 广播 → 宿主侧 pushTargetsToWidget 推回来 → 读本地缓存渲染。
+ * 签到、删除这类写操作仍在 /jmb 面板，避免两条写路径打架。
+ */
+public class TargetsActivity extends Activity {
+
+    private int bgColor, cardColor, textColor, subColor, okColor, waitColor, warnColor;
+    private LinearLayout root;
+    private TextView statusLine;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        boolean dark = (getResources().getConfiguration().uiMode & 0x30) == 0x20;
+        bgColor = dark ? 0xFF000000 : 0xFFF2F3F5;
+        cardColor = dark ? 0xFF1C1C1E : 0xFFFFFFFF;
+        textColor = dark ? 0xFFF5F5F5 : 0xFF1A1A1A;
+        subColor = dark ? 0xFF8E8E93 : 0xFF8A8A8E;
+        okColor = 0xFF34C759;
+        waitColor = 0xFFFF9F0A;
+        warnColor = 0xFFFF453A;
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(bgColor);
+        root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(16), statusBarHeight() + dp(8), dp(16), dp(32));
+        scroll.addView(root);
+        setContentView(scroll);
+        render(null, "正在向 Telegram 请求目标…");
+        requestTargets();
+    }
+
+    private void requestTargets() {
+        try {
+            Intent intent = new Intent(RemoteConfig.ACTION_REQUEST_TARGETS);
+            for (String pkg : new String[]{"fork.risin42.nagramx", "org.telegram.messenger",
+                    "org.telegram.messenger.web", "org.telegram.messenger.beta"}) {
+                intent.setPackage(pkg);
+                sendBroadcast(intent);
+            }
+        } catch (Throwable ignored) {}
+        // 给宿主 1.5 秒回推，然后渲染缓存（拿不到就显示提示）。
+        handler.postDelayed(this::loadFromCache, 1500);
+    }
+
+    private void loadFromCache() {
+        SharedPreferences prefs = getSharedPreferences(MiuiSettingsProvider.PREFS, Context.MODE_PRIVATE);
+        String json = prefs.getString("targets_json", null);
+        long at = prefs.getLong("targets_at", 0L);
+        String account = prefs.getString("targets_account", "0");
+        if (json == null) {
+            render(null, "还没有收到目标数据。请先在 Telegram 里打开一次 /jmb，再回来刷新。");
+            return;
+        }
+        try {
+            JSONArray arr = new JSONArray(json);
+            render(arr, "账号 " + account + " · " + arr.length() + " 个目标 · 更新于 "
+                    + new SimpleDateFormat("HH:mm", Locale.CHINA).format(new Date(at)));
+        } catch (Throwable t) {
+            render(null, "目标数据解析失败：" + t.getClass().getSimpleName());
+        }
+    }
+
+    private void render(JSONArray targets, String status) {
+        root.removeAllViews();
+        TextView title = new TextView(this);
+        title.setText("签到目标");
+        title.setTextSize(26);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(textColor);
+        title.setPadding(dp(6), dp(24), dp(6), dp(2));
+        root.addView(title);
+
+        statusLine = new TextView(this);
+        statusLine.setText(status);
+        statusLine.setTextSize(12);
+        statusLine.setTextColor(subColor);
+        statusLine.setPadding(dp(6), 0, dp(6), dp(10));
+        root.addView(statusLine);
+
+        TextView refresh = new TextView(this);
+        refresh.setText("刷新");
+        refresh.setTextSize(14);
+        refresh.setTextColor(0xFF2563EB);
+        refresh.setPadding(dp(6), dp(6), dp(6), dp(14));
+        refresh.setOnClickListener(v -> {
+            statusLine.setText("正在向 Telegram 请求目标…");
+            requestTargets();
+        });
+        root.addView(refresh);
+
+        if (targets == null || targets.length() == 0) {
+            TextView empty = new TextView(this);
+            empty.setText(targets == null ? "" : "目标列表是空的，先在 /jmb 里添加一个。");
+            empty.setTextSize(14);
+            empty.setTextColor(subColor);
+            empty.setPadding(dp(6), dp(4), dp(6), dp(4));
+            root.addView(empty);
+            return;
+        }
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(cardColor);
+        bg.setCornerRadius(dp(18));
+        card.setBackground(bg);
+        root.addView(card);
+
+        for (int i = 0; i < targets.length(); i++) {
+            JSONObject o = targets.optJSONObject(i);
+            if (o == null) continue;
+            card.addView(targetRow(o));
+        }
+    }
+
+    private View targetRow(JSONObject o) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(18), dp(14), dp(18), dp(14));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView name = new TextView(this);
+        name.setText(o.optString("title", o.optString("cmd", "未命名目标")));
+        name.setTextSize(16);
+        name.setTextColor(textColor);
+        texts.addView(name);
+
+        String cmd = o.optString("cmd", "");
+        String note = o.optString("note", "");
+        TextView sub = new TextView(this);
+        sub.setText(note.isEmpty() ? "/" + cmd.replace("/", "") : note);
+        sub.setTextSize(12);
+        sub.setTextColor(subColor);
+        sub.setPadding(0, dp(2), 0, 0);
+        texts.addView(sub);
+        row.addView(texts);
+
+        TextView badge = new TextView(this);
+        boolean signed = o.optBoolean("signed", false);
+        boolean pending = o.optBoolean("pending", false);
+        badge.setText(pending ? "待确认" : signed ? "已签" : "待签");
+        badge.setTextSize(13);
+        badge.setTextColor(pending ? warnColor : signed ? okColor : waitColor);
+        row.addView(badge);
+        return row;
+    }
+
+    private int statusBarHeight() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (id > 0) return getResources().getDimensionPixelSize(id);
+        return dp(24);
+    }
+
+    private int dp(int value) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value,
+                getResources().getDisplayMetrics());
+    }
+}

@@ -56,6 +56,20 @@ public class MiuiSettingsProvider extends ContentProvider {
             out.putLong("_updated", p.getLong("_updated", 0L));
             return out;
         }
+        if ("sync_targets".equals(method)) {
+            // Telegram 侧推送目标快照，只读缓存，供独立界面展示。
+            if (!callerAllowed(ctx)) return denied();
+            if (extras == null) return denied();
+            SharedPreferences.Editor editor = prefs(ctx).edit();
+            String json = extras.getString("json");
+            if (json != null) editor.putString("targets_json", json);
+            String account = extras.getString("account");
+            if (account != null) editor.putString("targets_account", account);
+            editor.putLong("targets_at", extras.getLong("at", System.currentTimeMillis()));
+            Bundle out = new Bundle();
+            out.putBoolean("saved", editor.commit());
+            return out;
+        }
         if ("put".equals(method)) {
             if (!callerAllowed(ctx)) return denied();
             if (extras == null || arg == null) return denied();

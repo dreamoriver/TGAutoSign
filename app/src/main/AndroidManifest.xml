@@ -25,6 +25,12 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".TargetsActivity"
+            android:exported="false"
+            android:label="签到目标"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar" />
+
         <provider
             android:name=".MiuiSettingsProvider"
             android:authorities="io.github.wlmosv_png.tgautosign.settings"
