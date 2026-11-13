@@ -133,6 +133,29 @@ public final class TGAutoSignEntry extends XposedModule {
                     + HostSymbols.summaryLine(), null);
         }
 
+        // ── 独立设置页的配置同步（方案二）──────────────────────────────
+        // 配置真身在模块自己的进程，这里先拉一次，之后靠广播刷新；
+        // 拉不到就继续用 Telegram 本地 prefs，行为与升级前一致。
+        try {
+            RemoteConfig.refresh(appContext);
+            android.content.IntentFilter filter =
+                    new android.content.IntentFilter(RemoteConfig.ACTION_CHANGED);
+            android.content.BroadcastReceiver receiver = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(Context c, android.content.Intent intent) {
+                    RemoteConfig.invalidate(c);
+                    logInfo("设置已从独立界面更新");
+                }
+            };
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                appContext.registerReceiver(receiver, filter, Context.RECEIVER_EXPORTED);
+            } else {
+                appContext.registerReceiver(receiver, filter);
+            }
+            logInfo("独立设置同步已就绪，缓存=" + RemoteConfig.isLoaded());
+        } catch (Throwable t) {
+            logError("注册设置同步失败", t);
+        }
+
         if (CORE == null) {
             synchronized (TGAutoSignEntry.class) {
                 if (CORE == null) {

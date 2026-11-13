@@ -38,24 +38,34 @@ public final class PrefsStore {
     // ───────────── 读 ─────────────
 
     public String s(String key, String def) {
+        // 独立设置页写的值优先；模块进程没起来时回落到 Telegram 本地。
+        String remote = RemoteConfig.getString(key);
+        if (remote != null) return remote;
         try { return prefs.getString(key, def); } catch (Throwable t) { return def; }
     }
 
     public String s(String key) { return s(key, ""); }
 
     public int i(String key, int def) {
+        Integer remote = RemoteConfig.getInt(key);
+        if (remote != null) return remote;
         try { return prefs.getInt(key, def); } catch (Throwable t) { return def; }
     }
 
     public long l(String key, long def) {
+        Long remote = RemoteConfig.getLong(key);
+        if (remote != null) return remote;
         try { return prefs.getLong(key, def); } catch (Throwable t) { return def; }
     }
 
     public boolean b(String key, boolean def) {
+        Boolean remote = RemoteConfig.getBoolean(key);
+        if (remote != null) return remote;
         try { return prefs.getBoolean(key, def); } catch (Throwable t) { return def; }
     }
 
     public boolean has(String key) {
+        if (RemoteConfig.has(key)) return true;
         try { return prefs.contains(key); } catch (Throwable t) { return false; }
     }
 
