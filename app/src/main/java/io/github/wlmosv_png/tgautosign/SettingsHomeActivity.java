@@ -54,7 +54,7 @@ public class SettingsHomeActivity extends Activity {
         scroll.setBackgroundColor(bgColor);
         root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(8), dp(16), dp(32));
+        root.setPadding(dp(16), statusBarHeight() + dp(8), dp(16), dp(32));
         scroll.addView(root);
         setContentView(scroll);
         render();
@@ -74,7 +74,7 @@ public class SettingsHomeActivity extends Activity {
         switchRow("只通知失败", "成功的不打扰", Keys.notifyFailOnly(), defaultBool("jmb_notify_fail_only", false));
         section("关于");
         valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
-        valueRow("目标管理", "在 Telegram 里发 /jmb 打开", "", null);
+        valueRow("目标管理", "在 Telegram 里发 /jmb 打开", "打开 ›", v -> openTelegram());
     }
 
     // ───────── 行构建 ─────────
@@ -270,6 +270,27 @@ public class SettingsHomeActivity extends Activity {
             sendBroadcast(intent);
         } catch (Throwable ignored) {}
         Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+    }
+
+    private int statusBarHeight() {
+        int id = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (id > 0) return getResources().getDimensionPixelSize(id);
+        return dp(24);
+    }
+
+    /** 从设置页直接跳回 Telegram，省得用户自己找图标。 */
+    private void openTelegram() {
+        for (String pkg : new String[]{"fork.risin42.nagramx", "org.telegram.messenger",
+                "org.telegram.messenger.web", "org.telegram.messenger.beta"}) {
+            try {
+                Intent intent = getPackageManager().getLaunchIntentForPackage(pkg);
+                if (intent != null) {
+                    startActivity(intent);
+                    return;
+                }
+            } catch (Throwable ignored) {}
+        }
+        Toast.makeText(this, "没找到 Telegram 客户端", Toast.LENGTH_SHORT).show();
     }
 
     /** 模块没开 buildConfig，版本号从 PackageManager 取。 */
