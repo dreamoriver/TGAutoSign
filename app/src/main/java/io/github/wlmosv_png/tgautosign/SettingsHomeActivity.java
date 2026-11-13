@@ -73,7 +73,7 @@ public class SettingsHomeActivity extends Activity {
         switchRow("签到结果通知", "签完在通知栏提示", Keys.notifyOn(), defaultBool("jmb_notify", true));
         switchRow("只通知失败", "成功的不打扰", Keys.notifyFailOnly(), defaultBool("jmb_notify_fail_only", false));
         section("关于");
-        valueRow("版本", BuildConfig.VERSION_NAME + " · 设置页由独立界面提供", "", null);
+        valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
         valueRow("目标管理", "在 Telegram 里发 /jmb 打开", "", null);
     }
 
@@ -270,6 +270,15 @@ public class SettingsHomeActivity extends Activity {
             sendBroadcast(intent);
         } catch (Throwable ignored) {}
         Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show();
+    }
+
+    /** 模块没开 buildConfig，版本号从 PackageManager 取。 */
+    private String appVersion() {
+        try {
+            return getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+        } catch (Throwable t) {
+            return "1.7.2";
+        }
     }
 
     private int dp(int value) {
