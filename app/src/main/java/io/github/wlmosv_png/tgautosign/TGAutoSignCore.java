@@ -3819,12 +3819,14 @@ public final class TGAutoSignCore {
                 if (idObj == null) continue;
                 String id = String.valueOf(idObj);
                 String did = String.valueOf(m.get("did"));
+                long didNum = 0L;
+                try { didNum = Long.parseLong(did); } catch (Throwable ignored) {}
                 org.json.JSONObject o = new org.json.JSONObject();
                 o.put("id", id);
                 o.put("did", did);
                 o.put("cmd", String.valueOf(m.get("text")));
                 String title;
-                try { title = targetTitle(did); } catch (Throwable t) { title = String.valueOf(m.get("text")); }
+                try { title = targetTitle(didNum); } catch (Throwable t) { title = String.valueOf(m.get("text")); }
                 o.put("title", title);
                 o.put("signed", today.equals(store.s(Keys.last(pfx, id))));
                 o.put("signedAt", store.l(Keys.signedAt(pfx, id), 0L));
