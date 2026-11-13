@@ -41,6 +41,20 @@
 | 自动补前置命令 | 「等不到带按钮的新消息」的 bot 需要用户手填前置命令 | 需要改发送流程，首次失败后自动补一次 `/start` |
 | 统计页 / 学习页搬进 App | 仍在面板 | 依赖目标数据双向流动 |
 
+## 2026-11-14 实测结论（未通）
+
+真机验证结果：**目标列表没有数据**。已确认的部分与线索：
+
+- LSPosed 日志显示模块**确实注入成功**：`(fork.risin42.nagramx)[io.github.wlmosv_png.tgautosign,TGAutoSignModule,...]`
+- 但模块 App 的 `shared_prefs/` 目录**完全不存在** → `MiuiSettingsProvider` 从未被调用过，`RemoteConfig.refresh` 也没有写过任何东西
+- LSPosed 日志里搜不到 `已推送目标快照` / `独立设置同步已就绪`，说明广播未被接收，或 `initBusiness` 里注册接收器那一段没有执行到
+
+下一步排查顺序（下次从这里开始）：
+
+1. 先确认 `initBusiness` 是否真的走到注册接收器那一行——日志里应有 `独立设置同步已就绪，缓存=...`；没有就是初始化早退或抛异常
+2. 若初始化正常，再看 `ACTION_REQUEST_TARGETS` 广播是否被系统拦（Android 14+ 对隐式广播与后台进程有限制，接收器虽然用 `RECEIVER_EXPORTED` 注册，但发送方是另一个 App）
+3. 兜底方案：不用广播，改为 TargetsActivity 直接通过 Provider 请求宿主执行一次导出（Provider 拉起模块进程 → 回调宿主不可行），或把快照写入时机改为「每次签到结束后顺手写」
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
