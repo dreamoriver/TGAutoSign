@@ -129,6 +129,33 @@ Provider 和广播都行不通后，改成本机 root 直读，已实机验证�
 
 已知备份位置：`/data/local/tmp/eta/tgas-prefs-backup.xml`（改造前快照）
 
+## 2026-11-14 09:50 写入实测：被宿主覆盖
+
+实测过程与结果：
+
+1. 在设置页切换「只通知失败」→ 顶部出现「有 1 项改动待生效」
+2. 检查文件：`jmb_notify_fail_only=true` 写入成功，
+   文件大小 11192 → 11249，属主仍是 `u0_a517`（chown 生效），`.bak` 已生成
+3. 点「重启 Telegram」→ force-stop 后重新拉起，pid 从 918 变 2666
+4. **重启后该键消失** —— 宿主启动时用自己内存里的缓存把整个文件覆盖回去了
+
+### 结论
+
+Android `SharedPreferences` 是"进程内缓存 + 整文件回写"，外部改文件在宿主运行期间
+必然被覆盖。这条链路不能只靠"写文件 + 重启"。
+
+### 可行修法（未实施）
+
+让宿主自己写：
+
+1. 模块 App 把待写配置写成 JSON 放在 `/sdcard/Download/tgas_pending.json`
+   （模块有存储权限能写，Telegram 有存储权限能读）
+2. Telegram 侧（模块 hook 里）在启动时或定时检查该文件，
+   读到自己写进 SharedPreferences，然后删掉文件
+3. 这样配置由宿主进程自己落盘，不会再被覆盖
+
+代价：要改 Telegram 侧的 hook 代码，重新注入一次；`/sdcard` 路径需要两端都有权限（都有）。
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
