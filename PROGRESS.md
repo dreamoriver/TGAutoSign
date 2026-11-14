@@ -156,6 +156,34 @@ Android `SharedPreferences` 是"进程内缓存 + 整文件回写"，外部改�
 
 代价：要改 Telegram 侧的 hook 代码，重新注入一次；`/sdcard` 路径需要两端都有权限（都有）。
 
+## 2026-11-14 12:00 命令通道跑通（最终方案）
+
+外部改 prefs 那条路彻底放弃，改用「宿主心跳消费命令文件」：
+
+1. 模块界面把 `set|key|type|value` 追加到宿主外部目录
+   `/sdcard/Android/data/<pkg>/files/tgas_cmd.txt`
+2. 宿主 `scheduleTickLoop`（心跳）每轮调用 `applyPendingCommands()`，
+   用自己的 `SharedPreferences` commit，读完删除文件
+3. 因为落盘的是宿主进程自己，不存在整文件回写覆盖的时序冲突
+
+**实测**：写入 `set|jmb_notify_fail_only|boolean|false` → 90 秒内文件被消费删除、
+键值写入成功、5 个目标配置完整无损（11.0K）。
+
+### 界面现状
+
+- 设置页恢复可写，改完提示「已下发，几秒内生效」，不需要重启 Telegram
+- 目标列表每 8 秒静默刷新一次（不闪加载态），也可以手动点刷新
+- 桌面只有一个图标，目标列表从设置页顶部卡片进入
+
+### 事故记录（重要）
+
+改成外部直写 prefs 的那一版把宿主 11KB 配置清成了 221B，5 个目标全丢。
+恢复路径：`/proc/1/root/data/data/<pkg>/shared_prefs/tg_autosign_gen.xml`（KSU 隔离下
+唯一能在进程停止后访问的入口），写回后 chown 回宿主 uid。备份在
+`/data/local/tmp/eta/tgas-prefs-backup.xml`。
+
+**结论：任何外部改宿主 prefs 的方案都不要再用，只走命令文件。**
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
