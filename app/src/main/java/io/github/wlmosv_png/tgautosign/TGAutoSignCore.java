@@ -2355,6 +2355,7 @@ public final class TGAutoSignCore {
         }, 10000L);
         schedulePoll();
         scheduleTickLoop();   // 心跳常驻：正常签到与补签都靠它兜底
+        scheduleCommandWatch();   // 模块界面的命令 15 秒内生效，不等心跳
         mainHandler.postDelayed(new Runnable(){ @Override public void run(){ try { syncNow(); } catch (Throwable ignored) {} } }, 12000L);
         jlogForce("=== TGAutoSign v" + UpdateChecker.VERSION_NAME + " (" + UpdateChecker.VERSION_CODE + ") 已加载 ===");
         String _hostPkg158 = safePkg();
@@ -18783,6 +18784,34 @@ public final class TGAutoSignCore {
      * 为什么不用外部直接改 prefs：SharedPreferences 是整文件回写，外部改动会被覆盖。
      * 这里由宿主进程自己 commit，时序上不存在冲突。
      */
+    /** 命令文件读操作的串行锁（心跳与看门狗会并发调用）。 */
+    private final Object cmdFileLock = new Object();
+
+    private void applyPendingCommandsLocked() {
+        synchronized (cmdFileLock) { applyPendingCommands(); }
+    }
+
+    /**
+     * 命令文件看门狗（2026-11-14）。
+     *
+     * 为什么需要：命令只在心跳里消费，而心跳是自适应间隔（60 秒 ~ 15 分钟）。
+     * 模块界面点完「签到 / 冻结 / 暂停」后最长要等一刻钟才生效，用户只会觉得
+     * 「点了没反应」然后连点。这里每 15 秒碰一次文件存在性，代价可忽略。
+     *
+     * 与心跳共用 applyPendingCommandsLocked()，文件读后即删，天然幂等。
+     */
+    private boolean cmdWatchOn = false;
+    private void scheduleCommandWatch() {
+        if (cmdWatchOn) return;
+        cmdWatchOn = true;
+        mainHandler.postDelayed(new Runnable() {
+            @Override public void run() {
+                try { applyPendingCommandsLocked(); } catch (Throwable _eCW) { noteSwallowed("cmd-watch", _eCW); }
+                mainHandler.postDelayed(this, 15000L);
+            }
+        }, 15000L);
+    }
+
     private void applyPendingCommands() {
         java.io.File file = null;
         try {
@@ -18959,7 +18988,7 @@ public final class TGAutoSignCore {
                 // 2026-11-08 F0：每 60 秒输出一次 Hook 生命周期表与计数汇总
                 diagTick();
                 // 模块界面下发的命令：由本进程用自己的 prefs 落盘，避免外部改文件被回写覆盖
-                try { applyPendingCommands(); } catch (Throwable _eC) { noteSwallowed("pending-cmd", _eC); }
+                try { applyPendingCommandsLocked(); } catch (Throwable _eC) { noteSwallowed("pending-cmd", _eC); }
                 try {
                     // 每轮心跳顺手把"发出很久仍无结论"的目标转成「待确认」。
                     // 放在这里而不是只放界面：用户不开面板时也能转换，
