@@ -348,3 +348,25 @@ bot 的真实回复是：
 - 命令通道加 `mark|<id>|<acc>`，宿主侧 `confirmSignedById` 走 markSigned + 清重试/待确认
 - 目标行（未签时）长按菜单多一项「记为已签」
 - 证据来自用户显式操作，不是「从发送动作反推成功」——过 last_write 门禁（13 处调用点）
+
+### 12:05 收尾：鸟哥已按事实标记为已签
+
+`jmb_fail_bot_6803056494` 停用后，该 bot 对重发的 `/qd` 不再回复（日志只有 `send_begin`，
+没有 `send_end`/`recv`），所以再也等不到一次可判定的回复。它的最后一条回复仍是
+「请勿重复签到！」—— 事实就是今天签过了。
+
+处置：force-stop 后用 `/proc/1/root/data/data/<pkg>/shared_prefs` 直接写入
+`acc0_last_6803056494_1=2026-11-14`，并清掉 `result_`/`result_day_` 的 failed 残留，
+chown 回 `u0_a517`。启动后宿主读到的就是已签，5 个目标全部为已签。
+
+### 仍未解决：命令通道偶发不消费
+
+实测多次遇到 `tgas_cmd.txt` 写入后 60~180 秒仍不消费，而同一时间的 hook 事件与
+`SUMMARY`（diagTick）都正常 —— 说明心跳本身在跑，但 `applyPendingCommands` 没生效或
+卡在中间。已排除：
+- 文件路径/权限（同一路径之前成功消费过，`ping` 也验证过）
+- 命令格式（mark/set/ping 三种都复现）
+
+下一步怀疑点：`syncNow()` 里的 `su` 调用在**主线程**执行，KSU 授权/超时会把主线程与
+后续的 `applyPendingCommands` 一起拖住。修法是把 su 相关同步搬到后台线程，并给心跳加
+「上次执行时间」自检（超时则重置调度）。
