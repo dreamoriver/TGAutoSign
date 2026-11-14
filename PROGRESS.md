@@ -254,3 +254,15 @@ statusOf、attentionHint、attentionLabel、roundProblemsOf、统计页原因都
 - 走的是与手工前置命令**同一条**状态机（waitingPanel → onPanelRefreshedForWaiting），
   面板一到立即点按钮，没有另写等待逻辑
 - 新增 `AutoPrestartTest`（6 条），已接进 build.sh 判定测试组
+
+## 2026-11-14 15:50 目标列表：暂停 / 冻结
+
+写操作原本已经有两类（`sign|<id>`、`del|<id>` 走命令通道），缺的是暂停与冻结。
+这次补齐，仍然复用同一条通道 —— 落盘的是宿主进程自己，不会出现外部改 prefs 被回写覆盖。
+
+- 命令通道新增 `freeze|<id>|<true|false>`、`snooze|<id>|<days>`（0 = 立即恢复，上限 30 天）
+- 宿主侧 `freezeEntryById` / `snoozeEntryById` 直接复用既有的 `setFrozen` 与 `snooze_` 键，
+  没有第二套状态；暂停到期日与「暂停一周」完全同源，到日自动失效
+- `RootConfig.readTargets` 解析 `frozen_` 与 `snooze_`（过期的当作未暂停）
+- 目标列表：徽标优先显示「已冻结 / 暂停中」（这两种状态下显示「待签」是误导）；
+  长按菜单改为 立即签到 / 暂停一周 / 恢复签到（暂停中才出现）/ 冻结·解冻 / 删除（二次确认）

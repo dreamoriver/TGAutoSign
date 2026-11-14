@@ -159,9 +159,19 @@ public class TargetsActivity extends Activity {
         row.addView(texts);
 
         TextView badge = new TextView(this);
-        badge.setText(t.signed ? "已签" : t.pending ? "待确认" : "待签");
+        // 2026-11-14：冻结 / 暂停优先显示 —— 这两种状态下「待签」是误导，
+        // 用户会以为它还会自己签，其实已经被停掉了。
+        if (t.frozen) {
+            badge.setText(Lang.tr("已冻结"));
+            badge.setTextColor(subColor);
+        } else if (!t.snoozeUntil.isEmpty()) {
+            badge.setText(Lang.tr("暂停中"));
+            badge.setTextColor(subColor);
+        } else {
+            badge.setText(t.signed ? "已签" : t.pending ? "待确认" : "待签");
+            badge.setTextColor(t.signed ? okColor : t.pending ? warnColor : waitColor);
+        }
         badge.setTextSize(13);
-        badge.setTextColor(t.signed ? okColor : t.pending ? warnColor : waitColor);
         badge.setPadding(dp(8), 0, dp(10), 0);
         row.addView(badge);
 
@@ -177,17 +187,41 @@ public class TargetsActivity extends Activity {
         });
         row.addView(action);
 
-        // 长按删除（二次确认）
+        // 长按：操作菜单（2026-11-14 加暂停 / 冻结；删除仍要二次确认）
         row.setOnLongClickListener(v -> {
+            final java.util.List<String> actions = new java.util.ArrayList<>();
+            final java.util.List<Runnable> runs = new java.util.ArrayList<>();
+            actions.add(Lang.tr("立即签到"));
+            runs.add(() -> sendCommand("sign|" + t.entryId));
+            if (!t.frozen) {
+                actions.add(Lang.tr("暂停一周"));
+                runs.add(() -> sendCommand("snooze|" + t.entryId + "|7"));
+            }
+            if (!t.snoozeUntil.isEmpty()) {
+                actions.add(Lang.tr("恢复签到"));
+                runs.add(() -> sendCommand("snooze|" + t.entryId + "|0"));
+            }
+            actions.add(t.frozen ? Lang.tr("解冻") : Lang.tr("冻结"));
+            runs.add(() -> sendCommand("freeze|" + t.entryId + "|" + (!t.frozen)));
+            actions.add(Lang.tr("删除"));
+            runs.add(() -> confirmDelete(t));
             new android.app.AlertDialog.Builder(this)
-                    .setTitle("删除目标")
-                    .setMessage(Lang.tr("确定删除「") + t.title + Lang.tr("」？这个操作不可撤销。"))
-                    .setPositiveButton("删除", (d, w) -> sendCommand("del|" + t.entryId))
-                    .setNegativeButton("取消", null)
+                    .setTitle(t.title)
+                    .setItems(actions.toArray(new String[0]), (d, which) -> runs.get(which).run())
                     .show();
             return true;
         });
         return row;
+    }
+
+    /** 删除二次确认（长按菜单里选「删除」后走这里）。 */
+    private void confirmDelete(RootConfig.Target t) {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(Lang.tr("删除目标"))
+                .setMessage(Lang.tr("确定删除「") + t.title + Lang.tr("」？这个操作不可撤销。"))
+                .setPositiveButton(Lang.tr("删除"), (d, w) -> sendCommand("del|" + t.entryId))
+                .setNegativeButton(Lang.tr("取消"), null)
+                .show();
     }
 
     /** 下发命令给宿主心跳执行。 */

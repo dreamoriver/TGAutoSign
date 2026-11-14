@@ -1160,6 +1160,15 @@ public final class Lang {
         EN.put("填前置命令（让模块自动拉面板）", "Add pre-command (pull the panel automatically)");
         EN.put("目标已不存在", "Target no longer exists");
         EN.put("回复判不出", "Reply unreadable");
+        // 2026-11-14：目标列表的暂停 / 冻结
+        EN.put("已冻结", "Frozen");
+        EN.put("暂停中", "Paused");
+        EN.put("立即签到", "Sign now");
+        EN.put("暂停一周", "Pause 1 week");
+        EN.put("恢复签到", "Resume");
+        EN.put("冻结", "Freeze");
+        EN.put("解冻", "Unfreeze");
+        EN.put("删除目标", "Delete target");
         // 2026-11-14：自动补前置命令
         EN.put("自动补前置命令", "Auto pre-command");
         EN.put("等不到带按钮的新消息时，自动发一次 /start 拉面板",

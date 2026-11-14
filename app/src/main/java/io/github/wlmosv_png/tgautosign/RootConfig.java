@@ -42,6 +42,10 @@ public final class RootConfig {
         public String signedAt = "";
         /** 最后一次成功签到的日期，没成功过就是空。 */
         public String lastDate = "";
+        /** 是否已冻结（不再自动签到，直到解冻）。 */
+        public boolean frozen = false;
+        /** 暂停到期日 yyyy-MM-dd；空 = 未暂停。 */
+        public String snoozeUntil = "";
     }
 
     private RootConfig() {}
@@ -90,6 +94,23 @@ public final class RootConfig {
         while (p.find()) {
             Target t = map.get("acc" + p.group(1) + "_" + p.group(2) + "_" + p.group(3));
             if (t != null) t.pending = true;
+        }
+        // 冻结：frozen_ 是布尔，不按天
+        Pattern frozen = Pattern.compile("<boolean name=\"acc(\\d+)_frozen_(\\d+)_(\\d+)\" value=\"true\"");
+        Matcher f = frozen.matcher(xml);
+        while (f.find()) {
+            Target t = map.get("acc" + f.group(1) + "_" + f.group(2) + "_" + f.group(3));
+            if (t != null) t.frozen = true;
+        }
+        // 暂停：snooze_ 存的是到期日，过期的当作没暂停
+        Pattern snooze = Pattern.compile("<string name=\"acc(\\d+)_snooze_(\\d+)_(\\d+)\">([^<]*)</string>");
+        Matcher s = snooze.matcher(xml);
+        while (s.find()) {
+            Target t = map.get("acc" + s.group(1) + "_" + s.group(2) + "_" + s.group(3));
+            if (t != null) {
+                String until = unescape(s.group(4));
+                if (until != null && until.compareTo(today) >= 0) t.snoozeUntil = until;
+            }
         }
         // 没有 title 的目标也列出来，用 botId 兜底
         Pattern did = Pattern.compile("<string name=\"acc(\\d+)_did_(\\d+)_(\\d+)\">([^<]*)</string>");

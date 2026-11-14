@@ -18815,6 +18815,22 @@ public final class TGAutoSignCore {
                             signEntryById(parts[1]);
                             applied++;
                             break;
+                            // 2026-11-14：目标列表里的暂停 / 冻结走同一条命令通道 ——
+                            // 落盘的是宿主进程自己，不存在外部改 prefs 被回写覆盖的时序问题。
+                            case "freeze":
+                                if (parts.length >= 3) {
+                                    freezeEntryById(parts[1], Boolean.parseBoolean(parts[2].trim()));
+                                    applied++;
+                                }
+                                break;
+                            case "snooze":
+                                if (parts.length >= 3) {
+                                    int _days = 0;
+                                    try { _days = Integer.parseInt(parts[2].trim()); } catch (Throwable ignored) {}
+                                    snoozeEntryById(parts[1], _days);
+                                    applied++;
+                                }
+                                break;
                         default:
                             break;
                     }
@@ -18845,6 +18861,48 @@ public final class TGAutoSignCore {
         } catch (Throwable t) {
             noteSwallowed("deleteEntryById", t);
         }
+    }
+
+    /** 冻结 / 解冻一个目标（模块界面命令通道，2026-11-14）。 */
+    private void freezeEntryById(String id, boolean frozen) {
+        try {
+            Map<String, Object> m = findEntryById(id);
+            if (m == null) {
+                android.util.Log.w("TGAutoSignCore", "模块界面冻结：目标不存在 id=" + id);
+                return;
+            }
+            setFrozen(m, currentAccount(), frozen);
+            android.util.Log.i("TGAutoSignCore", "模块界面冻结 id=" + id + " frozen=" + frozen);
+        } catch (Throwable t) { noteSwallowed("freezeEntryById", t); }
+    }
+
+    /**
+     * 暂停一个目标到 N 天后（0 = 立即恢复，2026-11-14）。
+     *
+     * 与界面「暂停一周」写**同一个键**（snooze_，值是到期日），到日自动失效；
+     * 不另立状态，避免两条写路径打架。上限 30 天，防手滑写成一年。
+     */
+    private void snoozeEntryById(String id, int days) {
+        try {
+            Map<String, Object> m = findEntryById(id);
+            if (m == null) {
+                android.util.Log.w("TGAutoSignCore", "模块界面暂停：目标不存在 id=" + id);
+                return;
+            }
+            String prefix = accountPrefix();
+            if (days <= 0) {
+                prefs.edit().remove(kSnooze(prefix, id)).apply();
+                invalidateTargetCache();
+                logs("【暂停】模块界面恢复：" + entryDisplayName(m) + " (" + id + ")");
+                return;
+            }
+            java.util.Calendar c = java.util.Calendar.getInstance();
+            c.add(java.util.Calendar.DAY_OF_YEAR, Math.min(days, 30));
+            String until = new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(c.getTime());
+            prefs.edit().putString(kSnooze(prefix, id), until).apply();
+            invalidateTargetCache();
+            logs("【暂停】模块界面暂停到 " + until + "：" + entryDisplayName(m) + " (" + id + ")");
+        } catch (Throwable t) { noteSwallowed("snoozeEntryById", t); }
     }
 
     /** 立即签到一个目标（manual=true，绕过今日已签等闸门）。 */
