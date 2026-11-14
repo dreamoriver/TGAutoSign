@@ -19,6 +19,8 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 
 import org.json.JSONArray;
+import java.util.ArrayList;
+import java.util.List;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
@@ -58,8 +60,8 @@ public class TargetsActivity extends Activity {
         root.setPadding(dp(16), statusBarHeight() + dp(8), dp(16), dp(32));
         scroll.addView(root);
         setContentView(scroll);
-        render(null, "正在向 Telegram 请求目标…");
-        requestTargets();
+        render(null, "正在读取 Telegram 的目标数据…");
+        loadFromRoot();
     }
 
     private void requestTargets() {
@@ -73,6 +75,78 @@ public class TargetsActivity extends Activity {
         } catch (Throwable ignored) {}
         // 给宿主 1.5 秒回推，然后渲染缓存（拿不到就显示提示）。
         handler.postDelayed(this::loadFromCache, 1500);
+    }
+
+    /** 直接用 root 读 Telegram 的 prefs，绕开包可见性限制。 */
+    private void loadFromRoot() {
+        new Thread(() -> {
+            List<RootConfig.Target> targets;
+            String error = null;
+            try {
+                targets = RootConfig.readTargets();
+            } catch (Throwable t) {
+                targets = new ArrayList<>();
+                error = t.getClass().getSimpleName();
+            }
+            final List<RootConfig.Target> result = targets;
+            final String failure = error;
+            runOnUiThread(() -> {
+                if (failure != null) {
+                    render(null, "读取失败：" + failure + "。请确认已授予 root 权限。");
+                } else if (result.isEmpty()) {
+                    render(null, "没读到目标。确认 Telegram 里已经有签到目标，且已授予 root 权限。");
+                } else {
+                    renderTargets(result);
+                }
+            });
+        }).start();
+    }
+
+    private void renderTargets(List<RootConfig.Target> targets) {
+        int signed = 0;
+        for (RootConfig.Target t : targets) if (t.signed) signed++;
+        render(null, targets.size() + " 个目标 · 今日已签 " + signed
+                + " · " + new SimpleDateFormat("HH:mm", Locale.CHINA).format(new Date()));
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(cardColor);
+        bg.setCornerRadius(dp(18));
+        card.setBackground(bg);
+        root.addView(card);
+        for (RootConfig.Target t : targets) card.addView(targetRow(t));
+    }
+
+    private View targetRow(RootConfig.Target t) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(18), dp(14), dp(18), dp(14));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView name = new TextView(this);
+        name.setText(t.title);
+        name.setTextSize(16);
+        name.setTextColor(textColor);
+        texts.addView(name);
+
+        TextView sub = new TextView(this);
+        sub.setText("bot " + t.botId + (t.kind.isEmpty() ? "" : " · " + t.kind));
+        sub.setTextSize(12);
+        sub.setTextColor(subColor);
+        sub.setPadding(0, dp(2), 0, 0);
+        texts.addView(sub);
+        row.addView(texts);
+
+        TextView badge = new TextView(this);
+        badge.setText(t.signed ? "已签" : "待签");
+        badge.setTextSize(13);
+        badge.setTextColor(t.signed ? okColor : waitColor);
+        row.addView(badge);
+        return row;
     }
 
     private void loadFromCache() {
@@ -116,8 +190,8 @@ public class TargetsActivity extends Activity {
         refresh.setTextColor(0xFF2563EB);
         refresh.setPadding(dp(6), dp(6), dp(6), dp(14));
         refresh.setOnClickListener(v -> {
-            statusLine.setText("正在向 Telegram 请求目标…");
-            requestTargets();
+            statusLine.setText("正在读取 Telegram 的目标数据…");
+            loadFromRoot();
         });
         root.addView(refresh);
 
