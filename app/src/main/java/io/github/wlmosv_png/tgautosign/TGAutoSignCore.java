@@ -18670,6 +18670,49 @@ public final class TGAutoSignCore {
         } catch (Throwable ignored) {}
     }
 
+    /**
+     * 处理模块界面下发的命令。
+     *
+     * 文件在宿主自己的外部目录：/sdcard/Android/data/<pkg>/files/tgas_cmd.txt
+     * 每行格式：set|key|type|value
+     *
+     * 为什么不用外部直接改 prefs：SharedPreferences 是整文件回写，外部改动会被覆盖。
+     * 这里由宿主进程自己 commit，时序上不存在冲突。
+     */
+    private void applyPendingCommands() {
+        java.io.File file = null;
+        try {
+            java.io.File dir = appContext.getExternalFilesDir(null);
+            if (dir == null) return;
+            file = new java.io.File(dir, "tgas_cmd.txt");
+            if (!file.exists()) return;
+            SharedPreferences.Editor editor = prefs.edit();
+            int applied = 0;
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new java.io.FileInputStream(file), "UTF-8"));
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.split("\\|");
+                    if (parts.length != 4 || !"set".equals(parts[0])) continue;
+                    if ("boolean".equals(parts[2])) editor.putBoolean(parts[1], Boolean.parseBoolean(parts[3]));
+                    else if ("int".equals(parts[2])) editor.putInt(parts[1], Integer.parseInt(parts[3]));
+                    else editor.putString(parts[1], parts[3]);
+                    applied++;
+                }
+            } finally {
+                reader.close();
+            }
+            if (applied > 0) {
+                boolean ok = editor.commit();
+                log("模块界面设置已应用 " + applied + " 项 commit=" + ok);
+            }
+            file.delete();
+        } catch (Throwable t) {
+            noteSwallowed("applyPendingCommands", t);
+        }
+    }
+
     private void scheduleTickLoop() {
         if (tickLoopOn) return;
         tickLoopOn = true;
@@ -18680,6 +18723,8 @@ public final class TGAutoSignCore {
                 } catch (Throwable _e23) { noteSwallowed("scheduleTickLoop", _e23); }
                 // 2026-11-08 F0：每 60 秒输出一次 Hook 生命周期表与计数汇总
                 diagTick();
+                // 模块界面下发的命令：由本进程用自己的 prefs 落盘，避免外部改文件被回写覆盖
+                try { applyPendingCommands(); } catch (Throwable _eC) { noteSwallowed("pending-cmd", _eC); }
                 try {
                     // 每轮心跳顺手把"发出很久仍无结论"的目标转成「待确认」。
                     // 放在这里而不是只放界面：用户不开面板时也能转换，

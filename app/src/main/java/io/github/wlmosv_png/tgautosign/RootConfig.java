@@ -273,6 +273,31 @@ public final class RootConfig {
         }
     }
 
+    /**
+     * 往宿主外部目录追一条命令，由宿主心跳读取后用自己的 prefs 落盘。
+     * 每行格式：set|key|type|value
+     */
+    public static boolean pushCommand(String pkg, String line) {
+        String dir = "/storage/emulated/0/Android/data/" + pkg + "/files";
+        Process process = null;
+        try {
+            process = Runtime.getRuntime().exec(new String[]{"su", "-c",
+                    "mkdir -p " + dir + " && cat >> " + dir + "/tgas_cmd.txt"});
+            java.io.OutputStream out = process.getOutputStream();
+            out.write((line + "\n").getBytes("UTF-8"));
+            out.flush();
+            out.close();
+            boolean ok = process.waitFor() == 0;
+            android.util.Log.i("RootConfig", "pushCommand ok=" + ok + " line=" + line);
+            return ok;
+        } catch (Throwable t) {
+            android.util.Log.e("RootConfig", "pushCommand 失败: " + t);
+            return false;
+        } finally {
+            if (process != null) process.destroy();
+        }
+    }
+
     /** 当前哪个客户端在运行。 */
     public static String runningClient() {
         for (String pkg : CLIENTS) {

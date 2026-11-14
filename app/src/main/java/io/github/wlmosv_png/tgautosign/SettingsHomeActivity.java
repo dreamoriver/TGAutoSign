@@ -68,7 +68,7 @@ public class SettingsHomeActivity extends Activity {
 
     private void render() {
         root.removeAllViews();
-        header("签到设置", "当前为只读：修改请回 Telegram 用 /jmb");
+        header("签到设置", "改完几秒内自动生效，不用重启 Telegram");
         addTargetsEntry();
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
@@ -194,11 +194,10 @@ public class SettingsHomeActivity extends Activity {
         addTexts(row, title, subtitle);
         Switch sw = new Switch(this);
         sw.setChecked(checked);
-        // 写入会破坏宿主的 SharedPreferences（实测把 11KB 配置清成 221B），
-        // 这里改成只读展示，修改请回 Telegram 的 /jmb 面板。
-        sw.setEnabled(false);
-        sw.setOnClickListener(v -> Toast.makeText(this,
-                "请在 Telegram 里用 /jmb 修改这项", Toast.LENGTH_SHORT).show());
+        sw.setOnCheckedChangeListener((b1, value) -> {
+            prefs.edit().putBoolean(key, value).commit();
+            saveRemote(key, "boolean", String.valueOf(value));
+        });
         row.addView(sw);
         currentCard().addView(row);
     }
@@ -213,10 +212,8 @@ public class SettingsHomeActivity extends Activity {
         if (click != null) val.setTextColor(accentColor);
         row.addView(val);
         if (click != null) {
-            View.OnClickListener notice = v -> Toast.makeText(this,
-                    "请在 Telegram 里用 /jmb 修改这项", Toast.LENGTH_SHORT).show();
-            row.setOnClickListener(notice);
-            val.setOnClickListener(notice);
+            row.setOnClickListener(click);
+            val.setOnClickListener(click);
         }
         currentCard().addView(row);
     }
@@ -322,12 +319,17 @@ public class SettingsHomeActivity extends Activity {
      * 所以攒到重启时一次性交给宿主自己写（见 pendingBar）。
      */
     private void saveRemote(String key, String type, String value) {
-        synchronized (pendingWrites) {
-            pendingWrites.removeIf(line -> line.startsWith(key + "|"));
-            pendingWrites.add(key + "|" + type + "|" + value);
-        }
-        pending = pendingWrites.size();
-        render();
+        new Thread(() -> {
+            String pkg = RootConfig.runningClient();
+            boolean ok = pkg != null && RootConfig.pushCommand(pkg, "set|" + key + "|" + type + "|" + value);
+            runOnUiThread(() -> {
+                if (ok) {
+                    Toast.makeText(this, "已下发，几秒内生效", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(this, "下发失败，请先打开一次 Telegram", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
     }
 
     private void editRemote(String key, String title, String hint) {
