@@ -40,6 +40,15 @@ public class TargetsActivity extends Activity {
     private LinearLayout root;
     private TextView statusLine;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private volatile boolean refreshing = false;
+    private final Runnable autoRefresh = new Runnable() {
+        @Override public void run() {
+            if (!isFinishing() && !isDestroyed()) {
+                loadFromRoot(true);
+                handler.postDelayed(this, 8000L);
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,7 +70,8 @@ public class TargetsActivity extends Activity {
         scroll.addView(root);
         setContentView(scroll);
         render(null, "正在读取 Telegram 的目标数据…");
-        loadFromRoot();
+        loadFromRoot(false);
+        handler.postDelayed(autoRefresh, 8000L);
     }
 
     private void requestTargets() {
@@ -77,8 +87,10 @@ public class TargetsActivity extends Activity {
         handler.postDelayed(this::loadFromCache, 1500);
     }
 
-    /** 直接用 root 读 Telegram 的 prefs，绕开包可见性限制。 */
-    private void loadFromRoot() {
+    /** 直接用 root 读 Telegram 的 prefs，绕开包可见性限制。silent=true 时不显示加载态。 */
+    private void loadFromRoot(boolean silent) {
+        if (refreshing) return;
+        refreshing = true;
         new Thread(() -> {
             List<RootConfig.Target> targets;
             String error = null;
@@ -91,10 +103,11 @@ public class TargetsActivity extends Activity {
             final List<RootConfig.Target> result = targets;
             final String failure = error;
             runOnUiThread(() -> {
+                refreshing = false;
                 if (failure != null) {
-                    render(null, "读取失败：" + failure + "。请确认已授予 root 权限。");
+                    if (!silent) render(null, "读取失败：" + failure + "。请确认已授予 root 权限。");
                 } else if (result.isEmpty()) {
-                    render(null, "没读到目标。确认 Telegram 里已经有签到目标，且已授予 root 权限。");
+                    if (!silent) render(null, "没读到目标。确认 Telegram 里已经有签到目标，且已授予 root 权限。");
                 } else {
                     renderTargets(result);
                 }
@@ -192,8 +205,8 @@ public class TargetsActivity extends Activity {
         refresh.setTextColor(0xFF2563EB);
         refresh.setPadding(dp(6), dp(6), dp(6), dp(14));
         refresh.setOnClickListener(v -> {
-            statusLine.setText("正在读取 Telegram 的目标数据…");
-            loadFromRoot();
+            statusLine.setText("正在刷新…");
+            loadFromRoot(false);
         });
         root.addView(refresh);
 
@@ -256,6 +269,12 @@ public class TargetsActivity extends Activity {
         badge.setTextColor(pending ? warnColor : signed ? okColor : waitColor);
         row.addView(badge);
         return row;
+    }
+
+    @Override
+    protected void onDestroy() {
+        handler.removeCallbacks(autoRefresh);
+        super.onDestroy();
     }
 
     private int statusBarHeight() {
