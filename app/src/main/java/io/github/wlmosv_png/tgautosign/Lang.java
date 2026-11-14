@@ -1160,6 +1160,16 @@ public final class Lang {
         EN.put("填前置命令（让模块自动拉面板）", "Add pre-command (pull the panel automatically)");
         EN.put("目标已不存在", "Target no longer exists");
         EN.put("回复判不出", "Reply unreadable");
+        // 2026-11-14：首屏「开始使用」引导
+        EN.put("开始使用（第一次必看）", "Getting started (read once)");
+        EN.put("① 在 LSPosed 里启用本模块、勾选 Telegram 客户端，然后重启一次 Telegram。",
+               "1. Enable this module in LSPosed, tick the Telegram client, then restart Telegram once.");
+        EN.put("② 回 Telegram，打开要签到的 bot，手动发一次它的签到指令（或 /start 拉出菜单点一次签到按钮）—— 模块靠这一步才认识这个目标。",
+               "2. Go back to Telegram, open the bot you want to sign in with, and send its check-in command once (or /start and tap the sign button) - that is how the module learns the target.");
+        EN.put("③ 回到这里打开「签到目标」，确认都学到了；漏掉的可以去 /jmb 面板的学习页确认候选。",
+               "3. Come back and open Targets to confirm they were learned; for missing ones, confirm candidates on the /jmb learn page.");
+        EN.put("④ 打开下面「定时签到」，之后每天在你设的窗口内自动签，不用再手动点。",
+               "4. Turn on Scheduled check-in below; from then on it signs automatically inside your window.");
         // 2026-11-14：目标列表的暂停 / 冻结
         EN.put("已冻结", "Frozen");
         EN.put("暂停中", "Paused");
@@ -1169,7 +1179,6 @@ public final class Lang {
         EN.put("冻结", "Freeze");
         EN.put("解冻", "Unfreeze");
         EN.put("删除目标", "Delete target");
-        EN.put("记为已签", "Mark as signed");
         // 2026-11-14：自动补前置命令
         EN.put("自动补前置命令", "Auto pre-command");
         EN.put("等不到带按钮的新消息时，自动发一次 /start 拉面板",

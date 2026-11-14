@@ -18788,7 +18788,15 @@ public final class TGAutoSignCore {
     private final Object cmdFileLock = new Object();
 
     private void applyPendingCommandsLocked() {
-        synchronized (cmdFileLock) { applyPendingCommands(); }
+        // 2026-11-14：放后台线程执行 —— 里面有文件 IO 与 prefs.commit，
+        // 在主线程（心跳）上做会拖慢 UI；一旦卡住还会连带停掉后续调度。
+        try {
+            LOG_IO.execute(new Runnable() {
+                @Override public void run() {
+                    synchronized (cmdFileLock) { applyPendingCommands(); }
+                }
+            });
+        } catch (Throwable t) { noteSwallowed("cmd-dispatch", t); }
     }
 
     /**
@@ -18816,7 +18824,10 @@ public final class TGAutoSignCore {
         java.io.File file = null;
         try {
             java.io.File dir = appContext.getExternalFilesDir(null);
-            if (dir == null) return;
+            if (dir == null) {
+                android.util.Log.w("TGAutoSignCore", "命令文件：外部目录不可用，本次跳过");
+                return;
+            }
             file = new java.io.File(dir, "tgas_cmd.txt");
             if (!file.exists()) return;
             SharedPreferences.Editor editor = prefs.edit();
@@ -18892,8 +18903,14 @@ public final class TGAutoSignCore {
                 boolean ok = editor.commit();
                 android.util.Log.i("TGAutoSignCore", "模块界面设置已应用 " + applied + " 项 commit=" + ok);
             }
-            file.delete();
+            if (!file.delete()) {
+                // 删不掉（常见于文件属主不是宿主 uid，FUSE 拒绝 unlink）：
+                // 截断成空文件，至少不会把同一批命令反复执行。
+                try { new java.io.FileOutputStream(file).close(); } catch (Throwable ignored) {}
+                android.util.Log.w("TGAutoSignCore", "命令文件删除失败，已截断: " + file.getAbsolutePath());
+            }
         } catch (Throwable t) {
+            android.util.Log.w("TGAutoSignCore", "命令文件处理失败: " + t);
             noteSwallowed("applyPendingCommands", t);
         }
     }
@@ -19030,6 +19047,13 @@ public final class TGAutoSignCore {
         tickLoopOn = true;
         mainHandler.postDelayed(new Runnable() {
             @Override public void run() {
+                // 2026-11-14：**先排下一轮，再干活**。
+                // 改前这句排在末尾 —— 只要中间任何一步卡住（文件 IO、锁、su），
+                // 后续调度就再也不会发生：实测表现为心跳静默停摆、命令文件再也不被消费，
+                // 而且没有任何异常日志（异常都被 noteSwallowed 吞了）。
+                long base = nextTickInterval();
+                long jitter = base >= TICK_IDLE_MS ? 0L : (long) (random.nextInt(15000));
+                mainHandler.postDelayed(this, base + jitter);
                 try {
                     syncNow();   // 跨客户端同步：先并别家的状态，再把本机写出去
                 } catch (Throwable _e23) { noteSwallowed("scheduleTickLoop", _e23); }
@@ -19093,11 +19117,6 @@ public final class TGAutoSignCore {
                         }
                     }
                 } catch (Throwable _e25) { noteSwallowed("scheduleTickLoop", _e25); }
-                // 自适应间隔：窗口内且有未签目标才保持高频，其余场景大幅降频，
-                // 避免整夜每 45 秒唤醒一次（耗电/发热的常见来源）。
-                long base = nextTickInterval();
-                long jitter = base >= TICK_IDLE_MS ? 0L : (long) (random.nextInt(15000));
-                mainHandler.postDelayed(this, base + jitter);
             }
         }, 4000L);
     }

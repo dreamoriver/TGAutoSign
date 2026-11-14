@@ -69,6 +69,11 @@ public class SettingsHomeActivity extends Activity {
     private void render() {
         root.removeAllViews();
         header("签到设置", "改完几秒内自动生效，不用重启 Telegram");
+        section(Lang.tr("开始使用（第一次必看）"));
+        note(Lang.tr("① 在 LSPosed 里启用本模块、勾选 Telegram 客户端，然后重启一次 Telegram。"));
+        note(Lang.tr("② 回 Telegram，打开要签到的 bot，手动发一次它的签到指令（或 /start 拉出菜单点一次签到按钮）—— 模块靠这一步才认识这个目标。"));
+        note(Lang.tr("③ 回到这里打开「签到目标」，确认都学到了；漏掉的可以去 /jmb 面板的学习页确认候选。"));
+        note(Lang.tr("④ 打开下面「定时签到」，之后每天在你设的窗口内自动签，不用再手动点。"));
         addTargetsEntry();
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
@@ -91,8 +96,6 @@ public class SettingsHomeActivity extends Activity {
                 editRemote("jmb_fail_words", "附加失败词", "多个词用逗号分隔"));
         section("关于");
         valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
-        valueRow(Lang.tr("签到目标"), Lang.tr("查看每个目标的今日状态"), "›", v ->
-                startActivity(new Intent(SettingsHomeActivity.this, TargetsActivity.class)));
     }
 
     // ───────── 行构建 ─────────
@@ -163,6 +166,17 @@ public class SettingsHomeActivity extends Activity {
                     : list.size() + " 个目标 · 今日已签 " + signed;
             runOnUiThread(() -> sub.setText(label));
         }).start();
+    }
+
+    /** 引导段落：用于「开始使用」这类多行说明（比副标题稍大，带行距）。 */
+    private void note(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(13);
+        t.setTextColor(subColor);
+        t.setLineSpacing(dp(5), 1f);
+        t.setPadding(dp(18), dp(11), dp(18), dp(11));
+        currentCard().addView(t);
     }
 
     private void section(String name) {
