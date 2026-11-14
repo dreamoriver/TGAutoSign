@@ -18856,9 +18856,20 @@ public final class TGAutoSignCore {
                             }
                             break;
                         case "mark":
-                            // 用户显式确认已签（目标列表长按）
+                            // 用户显式确认已签（目标列表长按）。
+                            // 2026-11-14 实测：这条命令**必须放后台线程** —— 它对标的是
+                            // markSigned，里面会播音效/回填标题，在心跳（主线程）里同步跑
+                            // 会把主线程卡住，之后心跳与命令看门狗一起停摆（表现为
+                            // 「命令再也不生效」，而且没有任何报错）。
                             if (parts.length >= 2) {
-                                confirmSignedById(parts[1], cmdAccountIndex(parts, 2));
+                                final String _mkId = parts[1];
+                                final int _mkAcc = cmdAccountIndex(parts, 2);
+                                new Thread(new Runnable() {
+                                    @Override public void run() {
+                                        try { confirmSignedById(_mkId, _mkAcc); }
+                                        catch (Throwable _eMK) { noteSwallowed("cmd-mark", _eMK); }
+                                    }
+                                }, "tgas-cmd-mark").start();
                                 applied++;
                             }
                             break;
