@@ -112,6 +112,23 @@ Provider 和广播都行不通后，改成本机 root 直读，已实机验证�
 3. 或者更稳妥：模块发一条 `/jmb` 命令消息让宿主自己写（但跨应用广播同样受可见性影响，
    需要在 Telegram 内触发）
 
+## 2026-11-14 09:20 配置写入
+
+- `RootConfig.writeValue(key, type, value)`：su 读 XML → 替换或插入键 → `cat >` 写回 →
+  `chown` 还原宿主 uid（不还原的话 Telegram 读不了自己的配置）→ 同目录留 `.bak`
+- `RootConfig.restartHost()`：force-stop 后 monkey 拉起
+- 设置页：开关 / 窗口 / 间隔 / 补签截止改动后立即写盘，顶部出现
+  「有 N 项改动待生效 · 点此重启 Telegram」，点一下重启宿主
+- 新增「判定与关键词」分组：签到关键词、排除规则、附加成功词、附加失败词
+
+**未实测**：改完时设备已锁屏。下次验证步骤：
+1. 改一个开关 → 顶部出现待生效条
+2. 点它重启 Telegram
+3. 重新进设置页看值是否保留（说明宿主已读到）
+4. 检查 `/data/data/<pkg>/shared_prefs/tg_autosign_gen.xml` 与 `.bak`
+
+已知备份位置：`/data/local/tmp/eta/tgas-prefs-backup.xml`（改造前快照）
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
