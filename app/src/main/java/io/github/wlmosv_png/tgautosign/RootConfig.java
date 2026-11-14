@@ -144,11 +144,15 @@ public final class RootConfig {
      */
     private static String readPrefs() {
         for (String pkg : CLIENTS) {
+            // 先走 init 的 namespace：不要求 Telegram 正在运行
+            String path = "/proc/1/root/data/data/" + pkg + "/shared_prefs/" + PREFS;
+            String content = exec("cat " + path);
+            if (content != null && content.contains("<map>")) return content;
+            // 回退到进程自己的 namespace
             String pids = exec("pidof " + pkg);
             if (pids == null || pids.trim().isEmpty()) continue;
             String pid = pids.trim().split("\\s+")[0];
-            String path = "/proc/" + pid + "/root/data/data/" + pkg + "/shared_prefs/" + PREFS;
-            String content = exec("cat " + path);
+            content = exec("cat /proc/" + pid + "/root/data/data/" + pkg + "/shared_prefs/" + PREFS);
             if (content != null && content.contains("<map>")) return content;
         }
         return null;
