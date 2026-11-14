@@ -86,6 +86,32 @@ Provider 本身是正常的——shell 用 `content call` 能拿到 `Bundle[{_up
 `RemoteConfig.refresh` 一直是 `缓存=false`，原因相同——Telegram 拉模块的 Provider 也被拒。
 所以「设置页改了，Telegram 不生效」不是后台限制，而是可见性。
 
+## 2026-11-14 09:00 root 方案跑通
+
+Provider 和广播都行不通后，改成本机 root 直读，已实机验证成功：
+
+- 关键坑：**KSU 有挂载隔离**，root shell 里 `/data/data/<pkg>` 不存在，
+  必须走进程 namespace：`su -c "cat /proc/$(pidof <pkg>)/root/data/data/<pkg>/shared_prefs/tg_autosign_gen.xml"`
+- 换路径后读到 9368 字节，解析出 5 个目标，今日已签 3，状态与 Telegram 内一致
+- 桌面入口收敛为一个图标（SettingsHomeActivity），目标列表从设置页顶部卡片进入
+- 设置页读取也改走 RootConfig.readAll()
+
+### 目前状态
+
+- ✅ 目标列表：可用，显示标题 / botId / 类型 / 已签待签
+- ✅ 设置页：读取的是 Telegram prefs；但 `jmb_window`、`jmb_timer`、`jmb_gap`
+  等键在 prefs 里**本来就不存在**（从未保存过），所以显示的是代码默认值
+- ❌ 设置页写入：仍写模块自己的 prefs，不生效
+
+### 下一步（写操作）
+
+要真正改配置，需要写 Telegram 的 prefs 并让宿主重读：
+
+1. `su -c` 用 sed/脚本修改 XML 里对应的 `jmb_*` 项
+2. `am force-stop <客户端>` 后重启，否则宿主的 SharedPreferences 内存缓存会覆盖
+3. 或者更稳妥：模块发一条 `/jmb` 命令消息让宿主自己写（但跨应用广播同样受可见性影响，
+   需要在 Telegram 内触发）
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
