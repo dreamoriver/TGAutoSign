@@ -107,10 +107,18 @@ public final class RootConfig {
         return null;
     }
 
-    /** su cat 目标文件；哪个客户端装了就读哪个。 */
+    /**
+     * su cat 目标文件。
+     *
+     * 注意：KSU 有挂载隔离，root shell 里直接访问 /data/data/<pkg> 会 No such file。
+     * 必须走进程自己的 namespace：/proc/<pid>/root/data/data/<pkg>/...
+     */
     private static String readPrefs() {
         for (String pkg : CLIENTS) {
-            String path = "/data/data/" + pkg + "/shared_prefs/" + PREFS;
+            String pids = exec("pidof " + pkg);
+            if (pids == null || pids.trim().isEmpty()) continue;
+            String pid = pids.trim().split("\\s+")[0];
+            String path = "/proc/" + pid + "/root/data/data/" + pkg + "/shared_prefs/" + PREFS;
             String content = exec("cat " + path);
             if (content != null && content.contains("<map>")) return content;
         }
