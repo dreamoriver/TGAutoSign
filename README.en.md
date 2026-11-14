@@ -183,23 +183,17 @@ You installed a debug build. Uninstall it, then install the official APK from th
 
 ## 更新日志 · Changelog
 
+### v1.8.0 (180) — 2026-11-14
+
+**New**: Captcha and rate-limit replies get their own verdicts. · Button-type targets now send a pre-command automatically. · Target list supports pause, freeze and manual "mark as signed". · New "Getting started" guide on the settings screen.
+
+**Fixed**: Settings/target commands no longer silently stall. · Removed the duplicated "Targets" entry on the settings screen.
+
 ### v1.7.2 (172) — 2026-11-13
 
 **New**: Runtime self-healing of host symbols. · Explicit status when symbol resolution fails.
 
 **Fixed**: Fixed misaligned APK entries that made Android 11+ reject installation. · Verdicts now take the strongest match instead of the first one in the word list. · Documentation wording no longer swallows an explicit verdict. · Fixed a cross-day state leak that could pin a target permanently. · Tightened verdict boundaries for panel announcements and quota wording.
-
-### v1.7.1 (171) — 2026-11-01
-
-**Fixed**: A target's fixed time is no longer bypassed by an all-day global window. · The heartbeat path no longer bypasses the sign-in gate. · The make-up window start is computed per target. · Account panels are no longer misread as sign-in failures. · Genuine rejections are still treated as failures.
-
-**New**: Mark a target as "not signed" again by hand.
-
-**Fixed**: Once a target is signed today, automatic verdicts no longer flip it. · Signed targets no longer enter the unrecognized-reply pool. · Revoking a sign-in now clears the signed timestamp too. · Self-heal for a torn signed state. · Every revocation is now logged with its reason.
-
-**UI**: The undo entry is now one compact row per target. · New "Paused" section: pausing no longer hides a target. · The entry menu now shows the actual state instead of a static label.
-
-**工程**: The make-up predicate gains a target-scoped overload. · The trigger-policy test is now part of the gate.
 
 [Full changelog →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 

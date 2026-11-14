@@ -2,6 +2,43 @@
 
 > 1.7.3 – 1.7.8 期间的构建**均未发版**，其记录已移至 [`docs/CHANGELOG-unreleased-172-178.md`](docs/CHANGELOG-unreleased-172-178.md)。
 
+## 1.8.0 (180) — 2026-11-14
+
+> 本版补齐两类「判定说不清」的情况与一系列目标操作：验证码/限流单独归类、按钮型 bot 自动补 `/start`、目标暂停/冻结/记为已签，并新增首屏使用引导。
+
+### 新增 · Added
+
+- **验证码 / 限流单独归类**
+  *Captcha and rate-limit replies get their own verdicts.*
+  bot 回「请输入验证码」「操作太频繁」时不再落入「回复判不出」。前者停手等人（不再自动重发，
+  越刷越难过验证），后者按退避重试且**不计失败**，界面文案、归因、统计页同步区分。
+- **按钮型目标自动补前置命令**
+  *Button-type targets now send a pre-command automatically.*
+  等不到带按钮的新消息且该目标没配前置命令时，自动发一次 `/start` 拉面板（按天一次），
+  复用既有等面板状态机；设置页可关。
+- **目标列表支持暂停 / 冻结 / 记为已签**
+  *Target list supports pause, freeze and manual "mark as signed".*
+  长按菜单新增：暂停一周、恢复、冻结/解冻、记为已签。全部走命令通道由宿主自己落盘，
+  不再有外部改 prefs 被回写覆盖的问题；命令带账号段，多账号下不再静默失效。
+- **首屏「开始使用」引导**
+  *New "Getting started" guide on the settings screen.*
+  写清第一次使用的四步：启用模块并重启 → 手动给 bot 发一次签到指令让模块学会 →
+  检查目标列表 → 打开定时签到。不用再猜怎么让模块自动签。
+
+### 修复 · Fixed
+
+- **「今天已经签过」被判不出**
+  *"Already signed today" is no longer reported as unreadable.*
+  `今天已经签过到啦 ✅ … 累计签到：127 天` 这类回复此前会命中非结论词「累计」并判不出，
+  目标一直显示待签。现把累计/连续+数字归为历史统计，并让明确的「已经签/今日已签/已签过」
+  优先于统计词（冷却语、统计尾缀、命令式重复提示仍保守不判成功）。
+- **命令下发偶发不生效**
+  *Settings/target commands no longer silently stall.*
+  心跳改为「先排下一轮再干活」，命令处理移到后台线程；命令文件删不掉时截断，
+  不再反复执行同一批命令。实测命令写入到生效从 60~180 秒降到 10~20 秒。
+- **设置页「签到目标」入口重复**
+  *Removed the duplicated "Targets" entry on the settings screen.*
+
 ## 1.7.2 (172) — 2026-11-13
 
 > Telegram 13.2.0 起 R8 会重排 `org.telegram.messenger.*` 的类名，依赖类名的钩子随之失效。本版引入运行时符号自愈：宿主更新后模块自行重新解析，不再依赖随版本发布的映射表。
