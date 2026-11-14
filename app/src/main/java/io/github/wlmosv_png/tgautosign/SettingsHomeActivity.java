@@ -63,6 +63,7 @@ public class SettingsHomeActivity extends Activity {
     private void render() {
         root.removeAllViews();
         header("签到设置", "改完自动同步到 Telegram，不用重启");
+        addTargetsEntry();
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
         valueRow("签到窗口", "只在这个时间段内签", windowLabel(), v -> pickWindow());
@@ -94,6 +95,58 @@ public class SettingsHomeActivity extends Activity {
         s.setTextColor(subColor);
         s.setPadding(dp(6), 0, dp(6), dp(10));
         root.addView(s);
+    }
+
+    /** 顶部目标入口：省得再去 /jmb 里翻，也避免桌面上出现两个图标。 */
+    private void addTargetsEntry() {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(dp(18), dp(16), dp(18), dp(16));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(cardColor);
+        bg.setCornerRadius(dp(18));
+        card.setBackground(bg);
+        card.setClickable(true);
+        card.setOnClickListener(v ->
+                startActivity(new Intent(SettingsHomeActivity.this, TargetsActivity.class)));
+
+        LinearLayout texts = new LinearLayout(this);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        texts.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView title = new TextView(this);
+        title.setText("签到目标");
+        title.setTextSize(16);
+        title.setTextColor(textColor);
+        texts.addView(title);
+        TextView sub = new TextView(this);
+        sub.setText("正在读取…");
+        sub.setTextSize(12);
+        sub.setTextColor(subColor);
+        sub.setPadding(0, dp(2), 0, 0);
+        texts.addView(sub);
+        card.addView(texts);
+
+        TextView arrow = new TextView(this);
+        arrow.setText("›");
+        arrow.setTextSize(20);
+        arrow.setTextColor(subColor);
+        card.addView(arrow);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(10);
+        root.addView(card, params);
+
+        new Thread(() -> {
+            java.util.List<RootConfig.Target> list = RootConfig.readTargets();
+            int signed = 0;
+            for (RootConfig.Target t : list) if (t.signed) signed++;
+            final String label = list.isEmpty()
+                    ? "点此查看（没读到数据，检查 root 授权）"
+                    : list.size() + " 个目标 · 今日已签 " + signed;
+            runOnUiThread(() -> sub.setText(label));
+        }).start();
     }
 
     private void section(String name) {
