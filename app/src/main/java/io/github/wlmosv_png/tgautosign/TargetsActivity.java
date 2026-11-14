@@ -203,6 +203,10 @@ public class TargetsActivity extends Activity {
             }
             actions.add(t.frozen ? Lang.tr("解冻") : Lang.tr("冻结"));
             runs.add(() -> sendCommand("freeze|" + t.entryId + "|" + (!t.frozen) + "|" + accOf(t)));
+            if (!t.signed) {
+                actions.add(Lang.tr("记为已签"));
+                runs.add(() -> sendCommand("mark|" + t.entryId + "|" + accOf(t)));
+            }
             actions.add(Lang.tr("删除"));
             runs.add(() -> confirmDelete(t));
             new android.app.AlertDialog.Builder(this)

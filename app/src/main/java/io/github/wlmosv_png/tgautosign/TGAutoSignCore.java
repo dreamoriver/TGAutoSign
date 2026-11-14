@@ -18855,6 +18855,13 @@ public final class TGAutoSignCore {
                                 applied++;
                             }
                             break;
+                        case "mark":
+                            // 用户显式确认已签（目标列表长按）
+                            if (parts.length >= 2) {
+                                confirmSignedById(parts[1], cmdAccountIndex(parts, 2));
+                                applied++;
+                            }
+                            break;
                         case "snooze":
                             if (parts.length >= 3) {
                                 int _days = 0;
@@ -18957,6 +18964,36 @@ public final class TGAutoSignCore {
     }
 
     /** 立即签到一个目标（manual=true，绕过今日已签等闸门）。 */
+    /**
+     * 模块界面「确认已签」（2026-11-14）。
+     *
+     * 为什么必须有这个入口：有些 bot 明确回了「请勿重复签到！」（= 今天已经签过），
+     * 但当时要么判定链没认出，要么用户误配的判定词把它记成了失败，之后 bot 不再回复
+     * —— 目标就永远停在「待签」，用户看着会话里的事实却没有入口纠正，
+     * 只能删掉目标重建（重建时还会顺带再签一次）。
+     *
+     * 证据来自**用户的眼睛**：这是人显式点「确认已签」，不是模块从发送动作反推成功
+     * （后者正是 last_write 门禁要拦的那类"假绿"）。
+     */
+    private void confirmSignedById(String id, int account) {
+        try {
+            Map<String, Object> m = findEntryById(id, account);
+            if (m == null) {
+                android.util.Log.w("TGAutoSignCore", "模块界面确认已签：目标不存在 id=" + id + " acc=" + account);
+                return;
+            }
+            String prefix = accountPrefix(account);
+            markSigned(prefix, id, "模块界面确认已签（用户手动）");
+            prefs.edit()
+                 .remove(kRetry(prefix, id))
+                 .remove(kRetryAt(prefix, id))
+                 .remove(kRetryDay(prefix, id))
+                 .apply();
+            clearPendingConfirm(prefix, id);
+            android.util.Log.i("TGAutoSignCore", "模块界面确认已签 id=" + id + " acc=" + account);
+        } catch (Throwable t) { noteSwallowed("confirmSignedById", t); }
+    }
+
     private void signEntryById(String id) { signEntryById(id, currentAccount()); }
 
     private void signEntryById(String id, final int account) {

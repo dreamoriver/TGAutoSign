@@ -1169,6 +1169,7 @@ public final class Lang {
         EN.put("冻结", "Freeze");
         EN.put("解冻", "Unfreeze");
         EN.put("删除目标", "Delete target");
+        EN.put("记为已签", "Mark as signed");
         // 2026-11-14：自动补前置命令
         EN.put("自动补前置命令", "Auto pre-command");
         EN.put("等不到带按钮的新消息时，自动发一次 /start 拉面板",
