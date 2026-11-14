@@ -37,6 +37,8 @@ public class SettingsHomeActivity extends Activity {
     private int bgColor, cardColor, textColor, subColor, accentColor, dividerColor;
     private LinearLayout root;
     private SharedPreferences prefs;
+    /** Telegram 里的真实配置（su 读出来），设置页优先用它渲染。 */
+    private final java.util.Map<String, String> remote = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,6 +59,7 @@ public class SettingsHomeActivity extends Activity {
         root.setPadding(dp(16), statusBarHeight() + dp(8), dp(16), dp(32));
         scroll.addView(root);
         setContentView(scroll);
+        remote.putAll(RootConfig.readAll());
         render();
     }
 
@@ -67,10 +70,10 @@ public class SettingsHomeActivity extends Activity {
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
         valueRow("签到窗口", "只在这个时间段内签", windowLabel(), v -> pickWindow());
-        valueRow("错开间隔", "多个目标之间隔几秒", prefs.getInt(Keys.gap(), 30) + " 秒", v -> pickGap());
+        valueRow("错开间隔", "多个目标之间隔几秒", gapValue() + " 秒", v -> pickGap());
         section("补签与提醒");
         switchRow("错过补签", "错过窗口后当天还能补一次", Keys.missBack(), defaultBool("jmb_missback", true));
-        valueRow("补签截止", "超过这个时间不再补", minuteLabel(prefs.getInt(Keys.missDeadline(), 23 * 60)), v -> pickDeadline());
+        valueRow("补签截止", "超过这个时间不再补", minuteLabel(deadlineValue()), v -> pickDeadline());
         switchRow("签到结果通知", "签完在通知栏提示", Keys.notifyOn(), defaultBool("jmb_notify", true));
         switchRow("只通知失败", "成功的不打扰", Keys.notifyFailOnly(), defaultBool("jmb_notify_fail_only", false));
         section("关于");
@@ -172,7 +175,9 @@ public class SettingsHomeActivity extends Activity {
     }
 
     private void switchRow(String title, String subtitle, String key, boolean def) {
-        boolean checked = prefs.contains(key) ? prefs.getBoolean(key, def) : def;
+        String raw = remote.get(key);
+        boolean checked = raw != null ? Boolean.parseBoolean(raw)
+                : (prefs.contains(key) ? prefs.getBoolean(key, def) : def);
         LinearLayout row = baseRow();
         addTexts(row, title, subtitle);
         Switch sw = new Switch(this);
@@ -238,7 +243,10 @@ public class SettingsHomeActivity extends Activity {
     }
 
     private String windowLabel() {
-        String window = prefs.getString(Keys.window(), null);
+        String window = remote.get(Keys.window());
+        if (window == null || window.isEmpty()) {
+            window = prefs.getString(Keys.window(), null);
+        }
         if (window == null || window.isEmpty()) {
             window = prefs.getString("jmb_window", "08:00-23:00");
         }
@@ -249,6 +257,18 @@ public class SettingsHomeActivity extends Activity {
         int h = Math.max(0, Math.min(23, minutes / 60));
         int m = Math.max(0, Math.min(59, minutes % 60));
         return String.format(java.util.Locale.US, "%02d:%02d", h, m);
+    }
+
+    private int gapValue() {
+        String raw = remote.get(Keys.gap());
+        try { return raw == null ? prefs.getInt(Keys.gap(), 30) : Integer.parseInt(raw.trim()); }
+        catch (Throwable t) { return prefs.getInt(Keys.gap(), 30); }
+    }
+
+    private int deadlineValue() {
+        String raw = remote.get(Keys.missDeadline());
+        try { return raw == null ? prefs.getInt(Keys.missDeadline(), 23 * 60) : Integer.parseInt(raw.trim()); }
+        catch (Throwable t) { return prefs.getInt(Keys.missDeadline(), 23 * 60); }
     }
 
     private int[] parseWindow() {

@@ -94,6 +94,20 @@ public final class RootConfig {
         return out;
     }
 
+    /** 一次性读出所有键值，设置页渲染时用这个，避免每条 su 一次。 */
+    public static Map<String, String> readAll() {
+        String xml = readPrefs();
+        Map<String, String> out = new LinkedHashMap<>();
+        if (xml == null) return out;
+        Matcher s = Pattern.compile("<string name=\"([^\"]+)\">([^<]*)</string>").matcher(xml);
+        while (s.find()) out.put(s.group(1), unescape(s.group(2)));
+        Matcher b = Pattern.compile("<boolean name=\"([^\"]+)\" value=\"(true|false)\"").matcher(xml);
+        while (b.find()) out.put(b.group(1), b.group(2));
+        Matcher i = Pattern.compile("<int name=\"([^\"]+)\" value=\"(-?\\d+)\"").matcher(xml);
+        while (i.find()) out.put(i.group(1), i.group(2));
+        return out;
+    }
+
     /** 读一份配置项（jmb_*），给设置页展示用。 */
     public static String readValue(String key) {
         String xml = readPrefs();
