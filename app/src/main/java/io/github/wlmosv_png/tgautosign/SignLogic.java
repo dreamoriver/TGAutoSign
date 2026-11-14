@@ -818,6 +818,20 @@ public final class SignLogic {
                 // 粗判：含"次"或数字
                 if (cflat.contains("次") || cflat.matches(".*[0-9０-９].*")) hasHistory = true;
             }
+            // 2026-11-14（真机事故，用户反馈「我都签到了却还显示待签」）：
+            //   「今天已经签过到啦 ✅ 日期：2026-11-14 累计签到：127 天 连续签到：69 天 …」
+            //   命中的非结论词是「累计」，但该分句里既没有「已签」也没有「签到过」
+            //   → hasHistory=false → NCOBJ_UNKNOWN → 保守判「判不出」，
+            //   于是后面 S5 的「已经签」永远没有机会跑。用户看到的就是「签过了显示待签」。
+            //   累计 / 连续 + 数字（天 / 次）是标准的**历史统计**形态，不是本次结论。
+            if (!hasHistory && (cflat.contains("累计") || cflat.contains("连续")
+                    || flat.contains("累计") || flat.contains("连续"))) {
+                // 数字口径用**整条**：形如「累计签到：127 天」时 objClauseRangeOf 可能
+                // 只切到「累计签到」这个短子句，数字落在子句外 —— 只看子句会漏判。
+                if (flat.contains("天") || flat.contains("次") || flat.matches(".*[0-9０-９].*")) {
+                    hasHistory = true;
+                }
+            }
 
             if (hasCurrent && !hasFuture) return NCOBJ_SIGN_CURRENT;   // 本次冷却
             if (hasHistory && !hasCurrent) return NCOBJ_HISTORY;       // 历史统计（非本次）
@@ -935,6 +949,25 @@ public final class SignLogic {
                         ncMatch.word, ncMatch.clause);
             }
         }
+        // ── 2026-11-14：**明确「今天已经签过」**的表述优先于「非结论」词（真机事故）──
+        //   「今天已经签过到啦 ✅ 日期：… 累计签到：127 天 …」
+        //   含「今天」（CURRENT_WORDS）→ nonConclusionObject 判成"本次冷却" → UNKNOWN
+        //   → 用户看到「明明签过了却显示待签」。
+        //
+        //   ⚠ 只放行**强表述**（已经签 / 今天已签 / 已签过 / 签到过 …），且整条消息
+        //   不含冷却语 —— 既有基线明确要求「签到成功 + 排行榜/已有 N 人/请稍后/冷却中」
+        //   保守不判成功，「已领取…」这类 DUP 词也必须继续走保守路径（实测会回归 5 条）。
+        m = matched(lower, dup);
+        if (m != null && isStrongSignedWord(m) && matched(lower, COOLDOWN_ONLY_WORDS) == null
+                // 命令式重复提示（「请勿重复签到」）优先级更高，必须留给 S5 REMINDER，
+                // 否则阶段会被记成 DUP（既有阶段表测试基线）。
+                && !isDuplicateReminder(in.reply)
+                && !negated(lower, m) && !isLikelyAnnouncement(in.reply)
+                && !(m.contains("重复") && hasTrailingNegation(lower))
+                && !hitInNonResultClause(in.reply, m)) {
+            return new StageResult(V_SIGNED, STAGE_DUP, m, clauseOfHit(in.reply, m));
+        }
+
         // ── 再判「冷却/等待/说明」子类（对象感知）──
         {
             Match ncMatch = matchAt(lower, NON_CONCLUSION_EFFECTIVE);
@@ -952,7 +985,10 @@ public final class SignLogic {
                     // 其他业务冷却 / 下一次提醒 / 历史统计 → 不构成，
                     // 落空继续 DUP/SUCCESS（成功分句仍有机会命中）
                 } else {
-                    // NCOBJ_UNKNOWN → 保守：宁可 UNKNOWN，不误签
+                    // NCOBJ_UNKNOWN → 保守：宁可 UNKNOWN，不误签。
+                    // 2026-11-14：这里**不再**额外放行 DUP —— 实测「签到冷却中…已签到 5 次」
+                    //   会在这一支被「已签到」命中而误判成功，破坏既有基线。
+                    //   真机那类「今天已经签过到啦 + 累计签到」由上面的强表述块处理。
                     return new StageResult(V_UNKNOWN, STAGE_NON_CONCLUSION,
                             ncMatch.word, ncMatch.clause);
                 }
@@ -1009,6 +1045,26 @@ public final class SignLogic {
      */
     /** 命中该"词"表示走的是「命令式重复提示」判据（见 isDuplicateReminder）。 */
     public static final String DUPLICATE_REMINDER_HIT = "已签过（重复提示）";
+
+    /** 冷却语（2026-11-14）：出现任一条，明确「今天已签」也要保守，不判成功。 */
+    private static final String[] COOLDOWN_ONLY_WORDS = {
+            "冷却", "请等待", "稍后", "后再试", "小时后", "分钟后再", "明天再来", "明日再来",
+            "try again in", "cooldown"
+    };
+
+    /**
+     * DUP 命中词是否属于**强「今天已签」表述**（2026-11-14）。
+     *
+     * 只认这些：「已经签」「今天已签」「今日已签」「本日已签」「已签过」「签到过」「您/你已签」。
+     * 刻意**不含**「已领取」「已参与」「已打卡」这类 —— 它们可以由别的业务触发，
+     * 既有基线（强成功 + 排行榜/已有 N 人/请稍后/冷却中 → 保守）依赖它们不被提前判成功。
+     */
+    private static boolean isStrongSignedWord(String w) {
+        if (w == null) return false;
+        return w.contains("已经签") || w.contains("今天已签") || w.contains("今日已签")
+                || w.contains("本日已签") || w.equals("已签过") || w.equals("签到过")
+                || w.equals("您已签") || w.equals("你已签");
+    }
 
     public static final String[] DUP_WORDS_DEFAULT = {
             // 中文：把「今天已签到」的各种常见写法都覆盖掉，避免用户还要自己加词。
