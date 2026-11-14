@@ -55,6 +55,37 @@
 2. 若初始化正常，再看 `ACTION_REQUEST_TARGETS` 广播是否被系统拦（Android 14+ 对隐式广播与后台进程有限制，接收器虽然用 `RECEIVER_EXPORTED` 注册，但发送方是另一个 App）
 3. 兜底方案：不用广播，改为 TargetsActivity 直接通过 Provider 请求宿主执行一次导出（Provider 拉起模块进程 → 回调宿主不可行），或把快照写入时机改为「每次签到结束后顺手写」
 
+## 2026-11-14 08:10 根因确认：Android 包可见性
+
+加了异常日志后拿到确切原因：
+
+```
+E ActivityThread: Failed to find provider info for io.github.wlmosv_png.tgautosign.settings
+E TGAutoSignCore: pushTargetsToWidget 失败:
+  java.lang.IllegalArgumentException: Unknown authority io.github.wlmosv_png.tgautosign.settings
+```
+
+Telegram（`fork.risin42.nagramx`，**targetSdk 36**）在自己的 manifest 里没有 `<queries>`
+声明模块包，Android 11+ 的包可见性过滤直接让 `ContentResolver` 解析不到这个 authority。
+Provider 本身是正常的——shell 用 `content call` 能拿到 `Bundle[{_updated=0}]`。
+
+**结论：这条跨进程通道在当前沙箱规则下走不通，不是代码 bug。**
+
+### 可行的替代路线
+
+1. **模块用 root 直读 Telegram 的 prefs**（推荐）
+   用户有 KernelSU，模块 App 申请一次 su 授权后，直接读
+   `/data/data/fork.risin42.nagramx/shared_prefs/*.xml` 里的 `jmb_*` 键，
+   完全绕开 Provider 和广播。代价是需要 root，且目标是 Telegram 私有目录。
+2. **放弃跨进程**：目标列表退回 `/jmb` 面板，只把设置页留在独立 App
+   （设置页方向是反的——Telegram 读模块，同样受可见性影响，需要一并改）
+3. MediaStore/Downloads 文件中转：两端都要存储权限，Android 13+ 还要 SAF，最麻烦，不建议
+
+### 附：设置页同步同样受影响
+
+`RemoteConfig.refresh` 一直是 `缓存=false`，原因相同——Telegram 拉模块的 Provider 也被拒。
+所以「设置页改了，Telegram 不生效」不是后台限制，而是可见性。
+
 ## 已知问题
 
 - **签到目标页数据为空**：需要先在 LSPosed 启用模块、作用域勾选客户端（本机为 `fork.risin42.nagramx`），重启 Telegram 后宿主才会推送快照
