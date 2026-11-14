@@ -32,6 +32,8 @@ public final class RootConfig {
 
     public static final class Target {
         public String key = "";
+        /** 宿主侧的目标 id，形如 <botId>_<entryId>，下发命令用这个。 */
+        public String entryId = "";
         public String botId = "";
         public String title = "";
         public String kind = "";
@@ -59,6 +61,7 @@ public final class RootConfig {
             Target t = new Target();
             t.key = "acc" + m.group(1) + "_" + m.group(2) + "_" + m.group(3);
             t.botId = m.group(2);
+            t.entryId = m.group(2) + "_" + m.group(3);
             t.title = unescape(m.group(4));
             map.put(t.key, t);
         }
@@ -97,6 +100,7 @@ public final class RootConfig {
                 Target t = new Target();
                 t.key = key;
                 t.botId = d.group(2);
+                t.entryId = d.group(2) + "_" + d.group(3);
                 t.title = "bot " + d.group(2);
                 map.put(key, t);
             }

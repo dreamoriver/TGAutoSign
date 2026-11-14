@@ -18694,11 +18694,26 @@ public final class TGAutoSignCore {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     String[] parts = line.split("\\|");
-                    if (parts.length != 4 || !"set".equals(parts[0])) continue;
-                    if ("boolean".equals(parts[2])) editor.putBoolean(parts[1], Boolean.parseBoolean(parts[3]));
-                    else if ("int".equals(parts[2])) editor.putInt(parts[1], Integer.parseInt(parts[3]));
-                    else editor.putString(parts[1], parts[3]);
-                    applied++;
+                    if (parts.length < 2) continue;
+                    switch (parts[0]) {
+                        case "set":
+                            if (parts.length != 4) break;
+                            if ("boolean".equals(parts[2])) editor.putBoolean(parts[1], Boolean.parseBoolean(parts[3]));
+                            else if ("int".equals(parts[2])) editor.putInt(parts[1], Integer.parseInt(parts[3]));
+                            else editor.putString(parts[1], parts[3]);
+                            applied++;
+                            break;
+                        case "del":
+                            deleteEntryById(parts[1]);
+                            applied++;
+                            break;
+                        case "sign":
+                            signEntryById(parts[1]);
+                            applied++;
+                            break;
+                        default:
+                            break;
+                    }
                 }
             } finally {
                 reader.close();
@@ -18710,6 +18725,41 @@ public final class TGAutoSignCore {
             file.delete();
         } catch (Throwable t) {
             noteSwallowed("applyPendingCommands", t);
+        }
+    }
+
+    /** 删除一个目标（与面板「删除目标」等价，只影响当前账号）。 */
+    private void deleteEntryById(String id) {
+        try {
+            String prefix = accountPrefix();
+            removeEntryKeys(prefix, id);
+            invalidateTargetCache();
+            for (int j = targets.size() - 1; j >= 0; j--) {
+                if (entryId(targets.get(j)).equals(id)) targets.remove(j);
+            }
+            android.util.Log.i("TGAutoSignCore", "模块界面删除目标 id=" + id);
+        } catch (Throwable t) {
+            noteSwallowed("deleteEntryById", t);
+        }
+    }
+
+    /** 立即签到一个目标（manual=true，绕过今日已签等闸门）。 */
+    private void signEntryById(String id) {
+        try {
+            final Map<String, Object> entry = findEntryById(id);
+            if (entry == null) {
+                android.util.Log.w("TGAutoSignCore", "模块界面签到：目标不存在 id=" + id);
+                return;
+            }
+            final int account = currentAccount();
+            // 发送链路耗时，放后台，别卡心跳
+            new Thread(() -> {
+                try { sendSign(entry, account, true); }
+                catch (Throwable t) { noteSwallowed("signEntryById", t); }
+            }, "tgas-cmd-sign").start();
+            android.util.Log.i("TGAutoSignCore", "模块界面手动签到 id=" + id);
+        } catch (Throwable t) {
+            noteSwallowed("signEntryById", t);
         }
     }
 

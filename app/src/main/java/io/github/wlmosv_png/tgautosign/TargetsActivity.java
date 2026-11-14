@@ -17,6 +17,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import java.util.ArrayList;
@@ -36,7 +37,7 @@ import java.util.Locale;
  */
 public class TargetsActivity extends Activity {
 
-    private int bgColor, cardColor, textColor, subColor, okColor, waitColor, warnColor;
+    private int bgColor, cardColor, textColor, subColor, okColor, waitColor, warnColor, accentColor;
     private LinearLayout root;
     private TextView statusLine;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -61,6 +62,7 @@ public class TargetsActivity extends Activity {
         okColor = 0xFF34C759;
         waitColor = 0xFFFF9F0A;
         warnColor = 0xFFFF453A;
+        accentColor = dark ? 0xFF3B82F6 : 0xFF2563EB;
 
         ScrollView scroll = new ScrollView(this);
         scroll.setBackgroundColor(bgColor);
@@ -160,8 +162,43 @@ public class TargetsActivity extends Activity {
         badge.setText(t.signed ? "已签" : t.pending ? "待确认" : "待签");
         badge.setTextSize(13);
         badge.setTextColor(t.signed ? okColor : t.pending ? warnColor : waitColor);
+        badge.setPadding(dp(8), 0, dp(10), 0);
         row.addView(badge);
+
+        TextView action = new TextView(this);
+        action.setText("签到");
+        action.setTextSize(13);
+        action.setTextColor(accentColor);
+        action.setPadding(dp(10), dp(6), dp(2), dp(6));
+        action.setOnClickListener(v -> {
+            action.setText("已下发");
+            action.setTextColor(subColor);
+            sendCommand("sign|" + t.entryId);
+        });
+        row.addView(action);
+
+        // 长按删除（二次确认）
+        row.setOnLongClickListener(v -> {
+            new android.app.AlertDialog.Builder(this)
+                    .setTitle("删除目标")
+                    .setMessage("确定删除「" + t.title + "」？这个操作不可撤销。")
+                    .setPositiveButton("删除", (d, w) -> sendCommand("del|" + t.entryId))
+                    .setNegativeButton("取消", null)
+                    .show();
+            return true;
+        });
         return row;
+    }
+
+    /** 下发命令给宿主心跳执行。 */
+    private void sendCommand(String line) {
+        new Thread(() -> {
+            String pkg = RootConfig.runningClient();
+            boolean ok = pkg != null && RootConfig.pushCommand(pkg, line);
+            runOnUiThread(() -> Toast.makeText(this,
+                    ok ? "已下发，几秒内生效" : "下发失败，请先打开一次 Telegram",
+                    Toast.LENGTH_SHORT).show());
+        }).start();
     }
 
     private void loadFromCache() {
