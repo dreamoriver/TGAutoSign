@@ -183,7 +183,7 @@ public class TargetsActivity extends Activity {
         action.setOnClickListener(v -> {
             action.setText(Lang.tr("已下发"));
             action.setTextColor(subColor);
-            sendCommand("sign|" + t.entryId);
+            sendCommand("sign|" + t.entryId + "|" + accOf(t));
         });
         row.addView(action);
 
@@ -192,17 +192,17 @@ public class TargetsActivity extends Activity {
             final java.util.List<String> actions = new java.util.ArrayList<>();
             final java.util.List<Runnable> runs = new java.util.ArrayList<>();
             actions.add(Lang.tr("立即签到"));
-            runs.add(() -> sendCommand("sign|" + t.entryId));
+            runs.add(() -> sendCommand("sign|" + t.entryId + "|" + accOf(t)));
             if (!t.frozen) {
                 actions.add(Lang.tr("暂停一周"));
-                runs.add(() -> sendCommand("snooze|" + t.entryId + "|7"));
+                runs.add(() -> sendCommand("snooze|" + t.entryId + "|7|" + accOf(t)));
             }
             if (!t.snoozeUntil.isEmpty()) {
                 actions.add(Lang.tr("恢复签到"));
-                runs.add(() -> sendCommand("snooze|" + t.entryId + "|0"));
+                runs.add(() -> sendCommand("snooze|" + t.entryId + "|0|" + accOf(t)));
             }
             actions.add(t.frozen ? Lang.tr("解冻") : Lang.tr("冻结"));
-            runs.add(() -> sendCommand("freeze|" + t.entryId + "|" + (!t.frozen)));
+            runs.add(() -> sendCommand("freeze|" + t.entryId + "|" + (!t.frozen) + "|" + accOf(t)));
             actions.add(Lang.tr("删除"));
             runs.add(() -> confirmDelete(t));
             new android.app.AlertDialog.Builder(this)
@@ -214,12 +214,29 @@ public class TargetsActivity extends Activity {
         return row;
     }
 
+    /**
+     * 目标所属账号槽位（key = accN_did_seq，2026-11-14）。
+     *
+     * 目标列表混列所有账号，命令必须带上账号，否则宿主按「当前账号」找，
+     * 目标不在当前账号时会被静默忽略。
+     */
+    private String accOf(RootConfig.Target t) {
+        try {
+            String key = t.key == null ? "" : t.key;
+            if (key.startsWith("acc")) {
+                int us = key.indexOf('_');
+                if (us > 3) return key.substring(3, us);
+            }
+        } catch (Throwable ignored) {}
+        return "0";
+    }
+
     /** 删除二次确认（长按菜单里选「删除」后走这里）。 */
     private void confirmDelete(RootConfig.Target t) {
         new android.app.AlertDialog.Builder(this)
                 .setTitle(Lang.tr("删除目标"))
                 .setMessage(Lang.tr("确定删除「") + t.title + Lang.tr("」？这个操作不可撤销。"))
-                .setPositiveButton(Lang.tr("删除"), (d, w) -> sendCommand("del|" + t.entryId))
+                .setPositiveButton(Lang.tr("删除"), (d, w) -> sendCommand("del|" + t.entryId + "|" + accOf(t)))
                 .setNegativeButton(Lang.tr("取消"), null)
                 .show();
     }

@@ -18808,29 +18808,32 @@ public final class TGAutoSignCore {
                             applied++;
                             break;
                         case "del":
-                            deleteEntryById(parts[1]);
+                            // 2026-11-14：带账号 —— 目标列表列的是所有账号的目标，
+                            // 旧实现按当前账号找，账号不一致时命令会被静默忽略。
+                            deleteEntryById(parts[1], cmdAccountIndex(parts, 2));
                             applied++;
                             break;
                         case "sign":
-                            signEntryById(parts[1]);
+                            signEntryById(parts[1], cmdAccountIndex(parts, 2));
                             applied++;
                             break;
-                            // 2026-11-14：目标列表里的暂停 / 冻结走同一条命令通道 ——
-                            // 落盘的是宿主进程自己，不存在外部改 prefs 被回写覆盖的时序问题。
-                            case "freeze":
-                                if (parts.length >= 3) {
-                                    freezeEntryById(parts[1], Boolean.parseBoolean(parts[2].trim()));
-                                    applied++;
-                                }
-                                break;
-                            case "snooze":
-                                if (parts.length >= 3) {
-                                    int _days = 0;
-                                    try { _days = Integer.parseInt(parts[2].trim()); } catch (Throwable ignored) {}
-                                    snoozeEntryById(parts[1], _days);
-                                    applied++;
-                                }
-                                break;
+                        // 2026-11-14：目标列表里的暂停 / 冻结走同一条命令通道 ——
+                        // 落盘的是宿主进程自己，不存在外部改 prefs 被回写覆盖的时序问题。
+                        case "freeze":
+                            if (parts.length >= 3) {
+                                freezeEntryById(parts[1], Boolean.parseBoolean(parts[2].trim()),
+                                                cmdAccountIndex(parts, 3));
+                                applied++;
+                            }
+                            break;
+                        case "snooze":
+                            if (parts.length >= 3) {
+                                int _days = 0;
+                                try { _days = Integer.parseInt(parts[2].trim()); } catch (Throwable ignored) {}
+                                snoozeEntryById(parts[1], _days, cmdAccountIndex(parts, 3));
+                                applied++;
+                            }
+                            break;
                         default:
                             break;
                     }
@@ -18849,9 +18852,28 @@ public final class TGAutoSignCore {
     }
 
     /** 删除一个目标（与面板「删除目标」等价，只影响当前账号）。 */
-    private void deleteEntryById(String id) {
+    /**
+     * 命令里带的账号槽位（缺省 = 当前账号，2026-11-14）。
+     *
+     * 为什么必须有：目标列表列的是**所有账号**的目标（key 形如 acc1_did_seq），
+     * 而旧实现一律按 currentAccount() 执行 —— 当前账号不是目标所属账号时，
+     * 点「签到 / 删除」会静默找不到目标（实测：acc0 的目标在 acc1 前台时删不掉）。
+     */
+    private int cmdAccountIndex(String[] parts, int idx) {
         try {
-            String prefix = accountPrefix();
+            if (parts != null && parts.length > idx && parts[idx] != null) {
+                int a = Integer.parseInt(parts[idx].trim());
+                if (a >= 0 && a < 16) return a;
+            }
+        } catch (Throwable ignored) {}
+        return currentAccount();
+    }
+
+    private void deleteEntryById(String id) { deleteEntryById(id, currentAccount()); }
+
+    private void deleteEntryById(String id, int account) {
+        try {
+            String prefix = accountPrefix(account);
             removeEntryKeys(prefix, id);
             invalidateTargetCache();
             for (int j = targets.size() - 1; j >= 0; j--) {
@@ -18864,15 +18886,15 @@ public final class TGAutoSignCore {
     }
 
     /** 冻结 / 解冻一个目标（模块界面命令通道，2026-11-14）。 */
-    private void freezeEntryById(String id, boolean frozen) {
+    private void freezeEntryById(String id, boolean frozen, int account) {
         try {
-            Map<String, Object> m = findEntryById(id);
+            Map<String, Object> m = findEntryById(id, account);
             if (m == null) {
-                android.util.Log.w("TGAutoSignCore", "模块界面冻结：目标不存在 id=" + id);
+                android.util.Log.w("TGAutoSignCore", "模块界面冻结：目标不存在 id=" + id + " acc=" + account);
                 return;
             }
-            setFrozen(m, currentAccount(), frozen);
-            android.util.Log.i("TGAutoSignCore", "模块界面冻结 id=" + id + " frozen=" + frozen);
+            setFrozen(m, account, frozen);
+            android.util.Log.i("TGAutoSignCore", "模块界面冻结 id=" + id + " frozen=" + frozen + " acc=" + account);
         } catch (Throwable t) { noteSwallowed("freezeEntryById", t); }
     }
 
@@ -18882,14 +18904,14 @@ public final class TGAutoSignCore {
      * 与界面「暂停一周」写**同一个键**（snooze_，值是到期日），到日自动失效；
      * 不另立状态，避免两条写路径打架。上限 30 天，防手滑写成一年。
      */
-    private void snoozeEntryById(String id, int days) {
+    private void snoozeEntryById(String id, int days, int account) {
         try {
-            Map<String, Object> m = findEntryById(id);
+            Map<String, Object> m = findEntryById(id, account);
             if (m == null) {
-                android.util.Log.w("TGAutoSignCore", "模块界面暂停：目标不存在 id=" + id);
+                android.util.Log.w("TGAutoSignCore", "模块界面暂停：目标不存在 id=" + id + " acc=" + account);
                 return;
             }
-            String prefix = accountPrefix();
+            String prefix = accountPrefix(account);
             if (days <= 0) {
                 prefs.edit().remove(kSnooze(prefix, id)).apply();
                 invalidateTargetCache();
@@ -18906,14 +18928,15 @@ public final class TGAutoSignCore {
     }
 
     /** 立即签到一个目标（manual=true，绕过今日已签等闸门）。 */
-    private void signEntryById(String id) {
+    private void signEntryById(String id) { signEntryById(id, currentAccount()); }
+
+    private void signEntryById(String id, final int account) {
         try {
-            final Map<String, Object> entry = findEntryById(id);
+            final Map<String, Object> entry = findEntryById(id, account);
             if (entry == null) {
-                android.util.Log.w("TGAutoSignCore", "模块界面签到：目标不存在 id=" + id);
+                android.util.Log.w("TGAutoSignCore", "模块界面签到：目标不存在 id=" + id + " acc=" + account);
                 return;
             }
-            final int account = currentAccount();
             // 发送链路耗时，放后台，别卡心跳
             new Thread(() -> {
                 try { sendSign(entry, account, true); }
