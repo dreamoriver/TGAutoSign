@@ -306,6 +306,14 @@ public final class RootConfig {
         }
     }
 
+    /** 已安装的客户端（不要求正在运行），命令可以先存着等它启动。 */
+    public static String installedClient() {
+        for (String pkg : CLIENTS) {
+            if (new java.io.File("/storage/emulated/0/Android/data/" + pkg + "/files").exists()) return pkg;
+        }
+        return runningClient();
+    }
+
     /** 当前哪个客户端在运行。 */
     public static String runningClient() {
         for (String pkg : CLIENTS) {

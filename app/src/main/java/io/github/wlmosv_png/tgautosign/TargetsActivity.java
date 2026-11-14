@@ -193,7 +193,7 @@ public class TargetsActivity extends Activity {
     /** 下发命令给宿主心跳执行。 */
     private void sendCommand(String line) {
         new Thread(() -> {
-            String pkg = RootConfig.runningClient();
+            String pkg = RootConfig.installedClient();
             boolean ok = pkg != null && RootConfig.pushCommand(pkg, line);
             runOnUiThread(() -> Toast.makeText(this,
                     ok ? "已下发，几秒内生效" : "下发失败，请先打开一次 Telegram",

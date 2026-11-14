@@ -286,7 +286,7 @@ public class SettingsHomeActivity extends Activity {
         bar.setOnClickListener(v -> {
             bar.setText("正在重启 Telegram…");
             new Thread(() -> {
-                String pkg = RootConfig.runningClient();
+                String pkg = RootConfig.installedClient();
                 boolean pushed = pkg != null && RootConfig.pushPending(pkg, new java.util.ArrayList<>(pendingWrites));
                 boolean ok = pushed && RootConfig.restartHost();
                 runOnUiThread(() -> {
@@ -320,7 +320,7 @@ public class SettingsHomeActivity extends Activity {
      */
     private void saveRemote(String key, String type, String value) {
         new Thread(() -> {
-            String pkg = RootConfig.runningClient();
+            String pkg = RootConfig.installedClient();
             boolean ok = pkg != null && RootConfig.pushCommand(pkg, "set|" + key + "|" + type + "|" + value);
             runOnUiThread(() -> {
                 if (ok) {
