@@ -36,7 +36,10 @@ public final class RootConfig {
         public String title = "";
         public String kind = "";
         public boolean signed = false;
+        public boolean pending = false;
         public String signedAt = "";
+        /** 最后一次成功签到的日期，没成功过就是空。 */
+        public String lastDate = "";
     }
 
     private RootConfig() {}
@@ -75,7 +78,15 @@ public final class RootConfig {
                 String value = unescape(l.group(4));
                 t.signed = today.equals(value);
                 t.signedAt = value;
+                t.lastDate = value;
             }
+        }
+        // 待确认：模块发了请求但没判定成功
+        Pattern pending = Pattern.compile("<boolean name=\"acc(\\d+)_pendcfm_(\\d+)_(\\d+)\" value=\"true\"");
+        Matcher p = pending.matcher(xml);
+        while (p.find()) {
+            Target t = map.get("acc" + p.group(1) + "_" + p.group(2) + "_" + p.group(3));
+            if (t != null) t.pending = true;
         }
         // 没有 title 的目标也列出来，用 botId 兜底
         Pattern did = Pattern.compile("<string name=\"acc(\\d+)_did_(\\d+)_(\\d+)\">([^<]*)</string>");

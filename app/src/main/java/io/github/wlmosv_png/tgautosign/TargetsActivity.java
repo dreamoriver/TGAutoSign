@@ -134,7 +134,9 @@ public class TargetsActivity extends Activity {
         texts.addView(name);
 
         TextView sub = new TextView(this);
-        sub.setText("bot " + t.botId + (t.kind.isEmpty() ? "" : " · " + t.kind));
+        String detail = "bot " + t.botId + (t.kind.isEmpty() ? "" : " · " + t.kind);
+        if (!t.signed && !t.lastDate.isEmpty()) detail += " · 上次 " + t.lastDate;
+        sub.setText(detail);
         sub.setTextSize(12);
         sub.setTextColor(subColor);
         sub.setPadding(0, dp(2), 0, 0);
@@ -142,9 +144,9 @@ public class TargetsActivity extends Activity {
         row.addView(texts);
 
         TextView badge = new TextView(this);
-        badge.setText(t.signed ? "已签" : "待签");
+        badge.setText(t.signed ? "已签" : t.pending ? "待确认" : "待签");
         badge.setTextSize(13);
-        badge.setTextColor(t.signed ? okColor : waitColor);
+        badge.setTextColor(t.signed ? okColor : t.pending ? warnColor : waitColor);
         row.addView(badge);
         return row;
     }
