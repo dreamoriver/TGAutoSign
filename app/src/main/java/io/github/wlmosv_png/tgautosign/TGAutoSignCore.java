@@ -18705,7 +18705,7 @@ public final class TGAutoSignCore {
             }
             if (applied > 0) {
                 boolean ok = editor.commit();
-                log("模块界面设置已应用 " + applied + " 项 commit=" + ok);
+                android.util.Log.i("TGAutoSignCore", "模块界面设置已应用 " + applied + " 项 commit=" + ok);
             }
             file.delete();
         } catch (Throwable t) {
