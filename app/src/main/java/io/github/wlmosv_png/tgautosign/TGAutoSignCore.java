@@ -2293,7 +2293,7 @@ public final class TGAutoSignCore {
             } catch (Throwable ignored) {}
             RETRY_LIMIT = cfgInt("retry", RETRY_LIMIT);
             WAKE_CMD = cfgStr("wake_cmd", "");
-            WINDOW = cfgStr("window", "");
+            WINDOW = cfgStr("window", "08:00-23:00");
             TIMER_ENABLED = cfgBool("timer", false);
             GAP_MIN = cfgInt("gap", 0);
             MISS_BACK = cfgBool("missback", false);
@@ -2501,7 +2501,7 @@ public final class TGAutoSignCore {
     private void reloadAccountConfig() {
         try {
             // ── 签到核心 ──
-            WINDOW = cfgStr("window", "");
+            WINDOW = cfgStr("window", "08:00-23:00");
             TIMER_ENABLED = cfgBool("timer", false);
             GAP_MIN = cfgInt("gap", 0);
             MISS_BACK = cfgBool("missback", false);
@@ -8111,10 +8111,23 @@ public final class TGAutoSignCore {
                                 String errText = "";
                                 try { errText = String.valueOf(getFieldVal(error, "text")); } catch (Throwable _e13) { noteSwallowed("sendSign", _e13); }
                                 String upper = errText.toUpperCase();
-                                final String[] PERMANENT = {"PEER_ID_INVALID","USER_BOT_INVALID","CHAT_WRITE_FORBIDDEN","USER_ID_INVALID","AUTH_KEY_UNREGISTERED","MESSAGE_EMPTY","CHAT_ID_INVALID","PEER_ID_NOT_EXIST","USER_PRIVACY_RESTRICTED"};
+                                final String[] PERMANENT = {"USER_BOT_INVALID","CHAT_WRITE_FORBIDDEN","USER_ID_INVALID","AUTH_KEY_UNREGISTERED","MESSAGE_EMPTY","CHAT_ID_INVALID","USER_PRIVACY_RESTRICTED"};
                                 boolean permanent = false;
                                 for (String s : PERMANENT) {
                                     if (upper.contains(s)) { permanent = true; break; }
+                                }
+                                boolean peerInvalid = upper.contains("PEER_ID_INVALID")
+                                        || upper.contains("PEER_ID_NOT_EXIST");
+                                if (peerInvalid) {
+                                    int _pn = prefs.getInt(kRetry(fPrefix, fId), 0) + 1;
+                                    prefs.edit().putInt(kRetry(fPrefix, fId), _pn)
+                                         .remove(kLast(fPrefix, fId))
+                                         .putLong(kRetryAt(fPrefix, fId), System.currentTimeMillis() + 30L * 60 * 1000)
+                                         .putString(kRetryDay(fPrefix, fId), todayStr()).apply();
+                                    logw("peer 无效(" + errText + ")：" + fId + " 第 " + _pn
+                                         + " 次失败，30 分钟后重试；在 TG 里打开该 bot 的聊天一次可修复");
+                                    noteResult(fAccount, false);
+                                    return null;
                                 }
                                 boolean panelStale = upper.contains("DATA_INVALID") || upper.contains("MESSAGE_ID_INVALID")
                                         || upper.contains("BUTTON") || upper.contains("MESSAGE_NOT_FOUND");

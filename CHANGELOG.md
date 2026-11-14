@@ -2,6 +2,24 @@
 
 > 1.7.3 – 1.7.8 期间的构建**均未发版**，其记录已移至 [`docs/CHANGELOG-unreleased-172-178.md`](docs/CHANGELOG-unreleased-172-178.md)。
 
+## 1.8.1 (181) — 2026-11-15
+
+> 修两个「设置说一套、运行时做另一套」的问题：签到窗口未配置时被当成不限时间，以及 peer 无效直接判当天永久失败。
+
+### 修复 · Fixed
+
+- **签到窗口没设过时被当成「不限」**
+  *Unset sign window no longer means "anytime".*
+  `cfgStr("window", "")` 在从未配置过窗口时返回空串，`windowRangeAny()` 对空串返回 null，
+  而 `inWindowAny()` 把 null 当作「不限」——于是设置页显示 08:00-23:00（那是 UI 兜底文案，
+  并未落盘），实际 07:30 打开 Telegram 就会签。现在未配置时回落默认 08:00-23:00；
+  显式清空窗口仍然表示不限，语义不变。
+- **PEER_ID_INVALID 不再判「今日永久失败」**
+  *PEER_ID_INVALID is retryable now.*
+  之前 `PEER_ID_INVALID` / `PEER_ID_NOT_EXIST` 在永久失败名单里，一次解析失败就当天放弃，
+  目标只能靠用户手动签。现在单独归类，30 分钟后重试，并在日志提示「在 TG 里打开该 bot
+  的聊天一次可修复」。
+
 ## 1.8.0 (180) — 2026-11-14
 
 > 本版补齐两类「判定说不清」的情况与一系列目标操作：验证码/限流单独归类、按钮型 bot 自动补 `/start`、目标暂停/冻结/记为已签，并新增首屏使用引导。

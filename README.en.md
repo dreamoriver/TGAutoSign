@@ -183,17 +183,33 @@ You installed a debug build. Uninstall it, then install the official APK from th
 
 ## 更新日志 · Changelog
 
+### v1.8.1 (181) — 2026-11-15
+
+**Fixed**: Unset sign window no longer means "anytime". · PEER_ID_INVALID is retryable now.
+
 ### v1.8.0 (180) — 2026-11-14
 
 **New**: Captcha and rate-limit replies get their own verdicts. · Button-type targets now send a pre-command automatically. · Target list supports pause, freeze and manual "mark as signed". · New "Getting started" guide on the settings screen.
 
 **Fixed**: Settings/target commands no longer silently stall. · Removed the duplicated "Targets" entry on the settings screen.
 
-### v1.7.2 (172) — 2026-11-13
+[Full changelog →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 
-**New**: Runtime self-healing of host symbols. · Explicit status when symbol resolution fails.
+## 更新日志 · Changelog
 
-**Fixed**: Fixed misaligned APK entries that made Android 11+ reject installation. · Verdicts now take the strongest match instead of the first one in the word list. · Documentation wording no longer swallows an explicit verdict. · Fixed a cross-day state leak that could pin a target permanently. · Tightened verdict boundaries for panel announcements and quota wording.
+### v1.8.1 (181) — 2026-11-15
+
+**Fixed**: Unset sign window no longer means "anytime". · PEER_ID_INVALID is retryable now.
+
+### v1.8.0 (180) — 2026-11-14
+
+**New**: Captcha and rate-limit replies get their own verdicts. · Button-type targets now send a pre-command automatically. · Target list supports pause, freeze and manual "mark as signed". · New "Getting started" guide on the settings screen.
+
+**Fixed**: Settings/target commands no longer silently stall. · Removed the duplicated "Targets" entry on the settings screen.
+
+[Full changelog →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
+
+[Full changelog →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 
 [Full changelog →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 

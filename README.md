@@ -202,17 +202,33 @@ sha256sum TGAutoSign-*.apk                     # 比对 Release 里的 sha256sum
 
 ## 更新日志 · Changelog
 
+### v1.8.1 (181) — 2026-11-15
+
+**修复**：签到窗口没设过时被当成「不限」 · PEER_ID_INVALID 不再判「今日永久失败」
+
 ### v1.8.0 (180) — 2026-11-14
 
 **新增**：验证码 / 限流单独归类 · 按钮型目标自动补前置命令 · 目标列表支持暂停 / 冻结 / 记为已签 · 首屏「开始使用」引导
 
 **修复**：「今天已经签过」被判不出 · 命令下发偶发不生效 · 设置页「签到目标」入口重复
 
-### v1.7.2 (172) — 2026-11-13
+[完整更新日志 →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 
-**新增**：宿主符号运行时自愈 · 符号解析失败时输出明确状态
+## 更新日志 · Changelog
 
-**修复**：APK 条目未对齐导致 Android 11+ 拒绝安装 · 判定命中改取最强匹配，不再由词表顺序决定 · 文档类措辞不再吞掉明确结论 · 跨天状态泄漏导致目标被永久钉死 · 面板公告与额度判断的边界收紧
+### v1.8.1 (181) — 2026-11-15
+
+**修复**：签到窗口没设过时被当成「不限」 · PEER_ID_INVALID 不再判「今日永久失败」
+
+### v1.8.0 (180) — 2026-11-14
+
+**新增**：验证码 / 限流单独归类 · 按钮型目标自动补前置命令 · 目标列表支持暂停 / 冻结 / 记为已签 · 首屏「开始使用」引导
+
+**修复**：「今天已经签过」被判不出 · 命令下发偶发不生效 · 设置页「签到目标」入口重复
+
+[完整更新日志 →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
+
+[完整更新日志 →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 
 [完整更新日志 →](https://github.com/wlmosv-png/TGAutoSign/blob/master/CHANGELOG.md)
 
