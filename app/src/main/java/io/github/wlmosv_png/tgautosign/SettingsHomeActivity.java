@@ -68,8 +68,7 @@ public class SettingsHomeActivity extends Activity {
 
     private void render() {
         root.removeAllViews();
-        header("签到设置", "改完需要重启一次 Telegram 生效");
-        if (pending > 0) pendingBar();
+        header("签到设置", "当前为只读：修改请回 Telegram 用 /jmb");
         addTargetsEntry();
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
@@ -195,10 +194,11 @@ public class SettingsHomeActivity extends Activity {
         addTexts(row, title, subtitle);
         Switch sw = new Switch(this);
         sw.setChecked(checked);
-        sw.setOnCheckedChangeListener((b, value) -> {
-            prefs.edit().putBoolean(key, value).commit();
-            saveRemote(key, "boolean", String.valueOf(value));
-        });
+        // 写入会破坏宿主的 SharedPreferences（实测把 11KB 配置清成 221B），
+        // 这里改成只读展示，修改请回 Telegram 的 /jmb 面板。
+        sw.setEnabled(false);
+        sw.setOnClickListener(v -> Toast.makeText(this,
+                "请在 Telegram 里用 /jmb 修改这项", Toast.LENGTH_SHORT).show());
         row.addView(sw);
         currentCard().addView(row);
     }
@@ -213,8 +213,10 @@ public class SettingsHomeActivity extends Activity {
         if (click != null) val.setTextColor(accentColor);
         row.addView(val);
         if (click != null) {
-            row.setOnClickListener(click);
-            val.setOnClickListener(click);
+            View.OnClickListener notice = v -> Toast.makeText(this,
+                    "请在 Telegram 里用 /jmb 修改这项", Toast.LENGTH_SHORT).show();
+            row.setOnClickListener(notice);
+            val.setOnClickListener(notice);
         }
         currentCard().addView(row);
     }
