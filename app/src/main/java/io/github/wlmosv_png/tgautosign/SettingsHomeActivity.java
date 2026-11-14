@@ -74,6 +74,7 @@ public class SettingsHomeActivity extends Activity {
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
         valueRow("签到窗口", "只在这个时间段内签", windowLabel(), v -> pickWindow());
         valueRow("错开间隔", "多个目标之间隔几秒", gapValue() + " 秒", v -> pickGap());
+        switchRow("自动补前置命令", "等不到带按钮的新消息时，自动发一次 /start 拉面板", "jmb_auto_prestart", true);
         section("补签与提醒");
         switchRow("错过补签", "错过窗口后当天还能补一次", Keys.missBack(), defaultBool("jmb_missback", true));
         valueRow("补签截止", "超过这个时间不再补", minuteLabel(deadlineValue()), v -> pickDeadline());

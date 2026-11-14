@@ -1160,6 +1160,10 @@ public final class Lang {
         EN.put("填前置命令（让模块自动拉面板）", "Add pre-command (pull the panel automatically)");
         EN.put("目标已不存在", "Target no longer exists");
         EN.put("回复判不出", "Reply unreadable");
+        // 2026-11-14：自动补前置命令
+        EN.put("自动补前置命令", "Auto pre-command");
+        EN.put("等不到带按钮的新消息时，自动发一次 /start 拉面板",
+               "Send /start once when no button message arrives, to pull the panel");
         // 2026-11-14：设置页 / 目标列表原先的裸中文（i18n 门禁欠账）
         EN.put("刷新", "Refresh");
         EN.put("正在刷新…", "Refreshing…");

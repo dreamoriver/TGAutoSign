@@ -240,3 +240,17 @@ statusOf、attentionHint、attentionLabel、roundProblemsOf、统计页原因都
 - 门禁：i18n / 测试接线 / 待处理状态机 / 孤儿键 / 判不出升级 / last_write / wiring 全绿
 - 顺手补了 TargetsActivity、SettingsHomeActivity 的裸中文，`check-ui-i18n` 从
   14 条缺失变 765/765 全绿（此前那些文案在英文设备上一直显示中文）
+
+## 2026-11-14 15:10 自动补前置命令
+
+「等不到带按钮的新消息」以前只有一句「稍后重试」，用户必须自己去条目的
+「编辑」里填前置命令，而多数人不知道该填什么 —— 表现就是这类 bot 永远签不上。
+
+现在：按钮型目标没配前置命令、面板又不新鲜时，自动发一次 `/start` 拉面板。
+
+- 判定抽成纯函数 `SignLogic.shouldAutoPrestart(enabled, hasOwnPreCommands, panelFresh, alreadyToday)`，
+  四个条件缺一不补；开关 `jmb_auto_prestart`（设置页「自动补前置命令」，默认开）
+- 一天只补一次（`prestart_day_`），避免同一个 bot 被反复刷 /start
+- 走的是与手工前置命令**同一条**状态机（waitingPanel → onPanelRefreshedForWaiting），
+  面板一到立即点按钮，没有另写等待逻辑
+- 新增 `AutoPrestartTest`（6 条），已接进 build.sh 判定测试组

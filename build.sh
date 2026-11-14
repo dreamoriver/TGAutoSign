@@ -110,7 +110,7 @@ if [ "${TGAS_SKIP_JUDGESET:-0}" != 1 ]; then
   _gcls="${TMPDIR:-/tmp}/tgas-gcls-$$"
   rm -rf "$_gcls"; mkdir -p "$_gcls"
   _gsrc="$TGAS_SRC/app/src/main/java/io/github/wlmosv_png/tgautosign"
-  _gtests="AnnouncementLengthTest AssistVerdictTest DualChainDiffTest MatchPositionTest ReplyMatchTest StageTableTest TriggerPolicyTest VerdictEvidenceTest StateLeakTest"
+  _gtests="AnnouncementLengthTest AssistVerdictTest AutoPrestartTest DualChainDiffTest MatchPositionTest ReplyMatchTest StageTableTest TriggerPolicyTest VerdictEvidenceTest StateLeakTest"
   _gj=""
   for _t in $_gtests; do _gj="$_gj $TGAS_SRC/tools/tests/$_t.java"; done
   if javac -nowarn -encoding UTF-8 -d "$_gcls" \

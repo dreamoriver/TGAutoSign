@@ -270,6 +270,13 @@ public final class TGAutoSignCore {
     private int DAILY_CAP = 60;                  // 每账号每日动作上限（防风控），/jmb 设置里可改
     private volatile long lastPaceAt = 0L;        // 连发节奏锁（jitter 用）
     private String WAKE_CMD = "";
+    /**
+     * 自动补前置命令用的指令（2026-11-14）。
+     *
+     * 为什么写死 /start：这是 Telegram bot 的通用唤醒指令，几乎不会误触发业务动作；
+     * 真正要用的自定义指令仍由条目的「前置命令序列」提供 —— 那条路优先。
+     */
+    private static final String AUTO_PRESTART_CMD = "/start";
     private String WINDOW = "";
     private boolean TIMER_ENABLED = false;       // 定时签到模式：开=只在窗口内按当日时刻表逐个签 / 关=全天自动补签
     private int THEME_MODE = 0;                  // 主题模式：0=自动（跟宿主/系统）1=始终日间 2=始终夜间
@@ -4569,6 +4576,41 @@ public final class TGAutoSignCore {
     private String entryLoc(Map<String,Object> m){ Object o=m.get("loc"); return o==null ? entryText(m) : String.valueOf(o); }
     private List<String> cbPres(Map<String,Object> m){ List<String> l=entryPre(m); if (l.isEmpty() && WAKE_CMD!=null && WAKE_CMD.length()>0) l.add(WAKE_CMD); return l; }
 
+    /** 「自动补前置命令」开关（设置页同名开关，默认开）。 */
+    private boolean autoPrestartEnabled() {
+        try { return cfgBool("auto_prestart", true); } catch (Throwable t) { return false; }
+    }
+
+    /** 该目标今天是否已经自动补过前置命令（按日一次，避免刷 bot）。 */
+    private boolean prestartDoneToday(String prefix, String id) {
+        try { return todayStr().equals(prefs.getString(prefix + "prestart_day_" + id, "")); }
+        catch (Throwable t) { return true; }   // 读不到就当补过：绝不冒险多发一条
+    }
+
+    /**
+     * 自动发一条 /start 拉面板，并进入「等面板」状态（2026-11-14）。
+     *
+     * 走的是与手工前置命令**同一条**状态机（waitingPanel + onPanelRefreshedForWaiting），
+     * 所以面板一到就立刻点按钮，不需要另写一套等待逻辑。
+     *
+     * @return true = 已发出，调用方应直接返回 SKIP_SEND_WAITING_PANEL
+     */
+    private boolean autoPrestartFire(Map<String,Object> entry, int account, Object peer, String prefix, String id) {
+        try {
+            if (peer == null) return false;
+            prefs.edit().putString(prefix + "prestart_day_" + id, todayStr()).apply();
+            synchronized (waitingPanel) {
+                waitingPanel.put(id, new long[]{entryDid(entry), account});
+                waitingPanelDeadline.put(id, System.currentTimeMillis() + PANEL_WAIT_MS);
+            }
+            jlog("[" + id + "] 没等到带按钮的新消息 → 自动补前置命令 " + AUTO_PRESTART_CMD
+                 + "（当天只补一次）");
+            sendPreAndResign(entry, account, peer,
+                    java.util.Collections.singletonList(AUTO_PRESTART_CMD), 0);
+            return true;
+        } catch (Throwable t) { noteSwallowed("autoPrestartFire", t); return false; }
+    }
+
 
 
 
@@ -7938,6 +7980,16 @@ public final class TGAutoSignCore {
                 // 拿不到就应"稍后重试"，而不是发一个必然失败的请求再标「待确认」。
                 boolean panelFresh = isPanelFresh(dialogId, 90L * 1000L);
                 if (live == null && !panelFresh) {
+                    // 2026-11-14：先尝试自动补一次前置命令，再退回"稍后重试"。
+                    // 老实现到这里只剩两件事：写「按钮失效」+ 等下一轮 —— 用户能做的
+                    // 只有自己去条目「编辑」里填前置命令，而多数人并不知道该填什么。
+                    if (SignLogic.shouldAutoPrestart(autoPrestartEnabled(), !pres.isEmpty(),
+                            panelFresh, prestartDoneToday(prefix, id))
+                            && autoPrestartFire(entry, account, peer, prefix, id)) {
+                        try { stateStore.markReason(prefix, id, SignLogic.R_BTN_STALE); }
+                        catch (Throwable ignored) {}
+                        return SignLogic.SKIP_SEND_WAITING_PANEL;
+                    }
                     logw("[" + id + "] 面板未就绪（该 bot 的按钮随消息变化，需等新消息）→ 本次跳过，稍后重试");
                     countSoftFail(entry, account, "等不到带签到按钮的新消息，稍后重试");
                     /* 2026-10-30（工单）：

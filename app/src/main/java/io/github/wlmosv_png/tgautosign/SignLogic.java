@@ -3503,6 +3503,29 @@ public final class SignLogic {
     }
 
     /**
+     * 是否该**自动补一次前置命令**（2026-11-14，纯函数，可离线单测）。
+     *
+     * 背景：按钮型 bot 里有一批「必须先收到指令才推面板」的。老实现只会在面板
+     * 未就绪时写一句「稍后重试」并把原因记成「按钮失效」，能做的只有让用户
+     * 自己去条目「编辑」里填前置命令 —— 而多数人不知道该填什么，最后表现
+     * 就是「这个 bot 永远签不上」。
+     *
+     * 四种情况都不补（缺一不可）：
+     *   · 用户关掉了开关；
+     *   · 条目自带前置命令 —— 那条路已经在上面跑过了，再补就是重复发；
+     *   · 面板还新鲜 —— 直接点按钮就行；
+     *   · 今天已经补过 —— 同一个 bot 一天被刷多次 /start 会被当垃圾请求。
+     */
+    public static boolean shouldAutoPrestart(boolean enabled, boolean hasOwnPreCommands,
+                                             boolean panelFresh, boolean alreadyToday) {
+        if (!enabled) return false;
+        if (hasOwnPreCommands) return false;
+        if (panelFresh) return false;
+        if (alreadyToday) return false;
+        return true;
+    }
+
+    /**
      * 触发源是否属于「用户刚打开宿主」这一类。
      *
      * 2026-11-12 从 TGAutoSignCore 迁入：它只做字符串判断，是纯逻辑。
