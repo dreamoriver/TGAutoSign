@@ -102,6 +102,41 @@ public final class TGAutoSignEntry extends XposedModule {
         }
     }
 
+    /** 读取模块界面写下的 tgas_pending.txt，写入宿主自己的 prefs，然后删掉文件。 */
+    private void applyPendingSettings(Context ctx) {
+        java.io.File file = null;
+        try {
+            java.io.File dir = ctx.getExternalFilesDir(null);
+            if (dir == null) return;
+            file = new java.io.File(dir, "tgas_pending.txt");
+            if (!file.exists()) return;
+            android.content.SharedPreferences prefs =
+                    ctx.getSharedPreferences("tg_autosign_gen", Context.MODE_PRIVATE);
+            android.content.SharedPreferences.Editor editor = prefs.edit();
+            int applied = 0;
+            java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new java.io.FileInputStream(file), "UTF-8"));
+            try {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    String[] parts = line.split("\\|");
+                    if (parts.length != 3) continue;
+                    if ("boolean".equals(parts[1])) editor.putBoolean(parts[0], Boolean.parseBoolean(parts[2]));
+                    else if ("int".equals(parts[1])) editor.putInt(parts[0], Integer.parseInt(parts[2]));
+                    else editor.putString(parts[0], parts[2]);
+                    applied++;
+                }
+            } finally {
+                reader.close();
+            }
+            boolean ok = editor.commit();
+            logInfo("应用独立界面设置 " + applied + " 项，commit=" + ok);
+            if (ok) file.delete();
+        } catch (Throwable t) {
+            logError("应用待生效设置失败", t);
+        }
+    }
+
     private void initBusiness(Context context, String packageName) {
         Context appContext = context.getApplicationContext() != null ? context.getApplicationContext() : context;
         if (appLoader == null) appLoader = context.getClassLoader();
@@ -166,6 +201,10 @@ public final class TGAutoSignEntry extends XposedModule {
         } catch (Throwable t) {
             logError("注册设置同步失败", t);
         }
+
+        // 应用独立界面下发的设置：必须由宿主自己写 SharedPreferences，
+        // 外部改 prefs 文件会在宿主回写时被覆盖。
+        applyPendingSettings(appContext);
 
         if (CORE == null) {
             synchronized (TGAutoSignEntry.class) {

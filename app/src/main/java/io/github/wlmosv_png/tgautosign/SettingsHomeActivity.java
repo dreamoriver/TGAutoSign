@@ -39,7 +39,8 @@ public class SettingsHomeActivity extends Activity {
     private SharedPreferences prefs;
     /** Telegram 里的真实配置（su 读出来），设置页优先用它渲染。 */
     private final java.util.Map<String, String> remote = new java.util.concurrent.ConcurrentHashMap<>();
-    /** 已写入磁盘但宿主还没重启的改动数。 */
+    /** 待应用的改动（key|type|value），重启时一次性交给宿主自己落盘。 */
+    private final java.util.List<String> pendingWrites = new java.util.ArrayList<>();
     private volatile int pending = 0;
 
     @Override
@@ -286,11 +287,17 @@ public class SettingsHomeActivity extends Activity {
         bar.setOnClickListener(v -> {
             bar.setText("正在重启 Telegram…");
             new Thread(() -> {
-                boolean ok = RootConfig.restartHost();
+                String pkg = RootConfig.runningClient();
+                boolean pushed = pkg != null && RootConfig.pushPending(pkg, new java.util.ArrayList<>(pendingWrites));
+                boolean ok = pushed && RootConfig.restartHost();
                 runOnUiThread(() -> {
+                    if (!ok) {
+                        bar.setText("下发失败，检查 root 权限");
+                        return;
+                    }
                     pending = 0;
-                    Toast.makeText(this, ok ? "已重启 Telegram" : "没找到运行中的客户端",
-                            Toast.LENGTH_SHORT).show();
+                    pendingWrites.clear();
+                    Toast.makeText(this, "已下发并重启 Telegram", Toast.LENGTH_SHORT).show();
                     render();
                 });
             }).start();
@@ -306,19 +313,19 @@ public class SettingsHomeActivity extends Activity {
         return value == null || value.trim().isEmpty() ? fallback : value;
     }
 
-    /** 后台写 Telegram 的 prefs，写完提示需要重启。 */
+    /**
+     * 只记录改动，不立刻写盘。
+     *
+     * SharedPreferences 由宿主进程独占，外部改文件会被它回写覆盖，
+     * 所以攒到重启时一次性交给宿主自己写（见 pendingBar）。
+     */
     private void saveRemote(String key, String type, String value) {
-        new Thread(() -> {
-            boolean ok = RootConfig.writeValue(key, type, value);
-            runOnUiThread(() -> {
-                if (ok) {
-                    pending++;
-                    render();
-                } else {
-                    Toast.makeText(this, "写入失败，检查 root 权限", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }).start();
+        synchronized (pendingWrites) {
+            pendingWrites.removeIf(line -> line.startsWith(key + "|"));
+            pendingWrites.add(key + "|" + type + "|" + value);
+        }
+        pending = pendingWrites.size();
+        render();
     }
 
     private void editRemote(String key, String title, String hint) {

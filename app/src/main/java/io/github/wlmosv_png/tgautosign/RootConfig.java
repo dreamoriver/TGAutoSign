@@ -240,6 +240,48 @@ public final class RootConfig {
         }
     }
 
+    /**
+     * 把待生效设置写到宿主自己的外部目录，由宿主进程自己落盘。
+     *
+     * 为什么不直接改 prefs：SharedPreferences 是"内存缓存 + 整文件回写"，
+     * 外部改文件在宿主运行时必被覆盖。写到这里，宿主启动时读一次就自己写入。
+     *
+     * 每行格式：key|type|value
+     */
+    public static boolean pushPending(String pkg, java.util.List<String> lines) {
+        if (lines == null || lines.isEmpty()) return false;
+        String dir = "/storage/emulated/0/Android/data/" + pkg + "/files";
+        StringBuilder body = new StringBuilder();
+        for (String line : lines) body.append(line).append('\n');
+        // /sdcard 走 FUSE，不支持 chown，也不需要对端改属主
+        Process process = null;
+        try {
+            process = Runtime.getRuntime().exec(new String[]{"su", "-c",
+                    "mkdir -p " + dir + " && cat > " + dir + "/tgas_pending.txt"});
+            java.io.OutputStream out = process.getOutputStream();
+            out.write(body.toString().getBytes("UTF-8"));
+            out.flush();
+            out.close();
+            boolean ok = process.waitFor() == 0;
+            android.util.Log.i("RootConfig", "pushPending ok=" + ok + " lines=" + lines.size());
+            return ok;
+        } catch (Throwable t) {
+            android.util.Log.e("RootConfig", "pushPending 失败: " + t);
+            return false;
+        } finally {
+            if (process != null) process.destroy();
+        }
+    }
+
+    /** 当前哪个客户端在运行。 */
+    public static String runningClient() {
+        for (String pkg : CLIENTS) {
+            String pids = exec("pidof " + pkg);
+            if (pids != null && !pids.trim().isEmpty()) return pkg;
+        }
+        return null;
+    }
+
     /** 重启宿主，让新配置生效。 */
     public static boolean restartHost() {
         for (String pkg : CLIENTS) {
