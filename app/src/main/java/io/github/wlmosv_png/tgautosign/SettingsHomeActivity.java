@@ -39,6 +39,8 @@ public class SettingsHomeActivity extends Activity {
     private SharedPreferences prefs;
     /** Telegram 里的真实配置（su 读出来），设置页优先用它渲染。 */
     private final java.util.Map<String, String> remote = new java.util.concurrent.ConcurrentHashMap<>();
+    /** 已写入磁盘但宿主还没重启的改动数。 */
+    private volatile int pending = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -65,7 +67,8 @@ public class SettingsHomeActivity extends Activity {
 
     private void render() {
         root.removeAllViews();
-        header("签到设置", "改完自动同步到 Telegram，不用重启");
+        header("签到设置", "改完需要重启一次 Telegram 生效");
+        if (pending > 0) pendingBar();
         addTargetsEntry();
         section("签到");
         switchRow("定时签到", "每天在窗口内自动签一次", Keys.timer(), defaultBool("jmb_timer", true));
@@ -76,6 +79,15 @@ public class SettingsHomeActivity extends Activity {
         valueRow("补签截止", "超过这个时间不再补", minuteLabel(deadlineValue()), v -> pickDeadline());
         switchRow("签到结果通知", "签完在通知栏提示", Keys.notifyOn(), defaultBool("jmb_notify", true));
         switchRow("只通知失败", "成功的不打扰", Keys.notifyFailOnly(), defaultBool("jmb_notify_fail_only", false));
+        section("判定与关键词");
+        valueRow("签到关键词", "按钮文案里包含哪些词算签到", valueOr("jmb_keywords", "默认内置"), v ->
+                editRemote("jmb_keywords", "签到关键词", "多个词用逗号分隔"));
+        valueRow("排除规则", "命中就不自动学，支持正则", valueOr("jmb_exclude", "未设置"), v ->
+                editRemote("jmb_exclude", "排除规则", "关键词或正则，命中即跳过"));
+        valueRow("附加成功词", "机器人说这些话算签上了", valueOr("jmb_ok_words", "未设置"), v ->
+                editRemote("jmb_ok_words", "附加成功词", "多个词用逗号分隔"));
+        valueRow("附加失败词", "机器人说这些话算失败", valueOr("jmb_fail_words", "未设置"), v ->
+                editRemote("jmb_fail_words", "附加失败词", "多个词用逗号分隔"));
         section("关于");
         valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
         valueRow("签到目标", "查看每个目标的今日状态", "›", v ->
@@ -184,7 +196,7 @@ public class SettingsHomeActivity extends Activity {
         sw.setChecked(checked);
         sw.setOnCheckedChangeListener((b, value) -> {
             prefs.edit().putBoolean(key, value).commit();
-            notifyTelegram();
+            saveRemote(key, "boolean", String.valueOf(value));
         });
         row.addView(sw);
         currentCard().addView(row);
@@ -259,6 +271,74 @@ public class SettingsHomeActivity extends Activity {
         return String.format(java.util.Locale.US, "%02d:%02d", h, m);
     }
 
+    /** 顶部「待生效」提示条，点一下重启宿主。 */
+    private void pendingBar() {
+        TextView bar = new TextView(this);
+        bar.setText("有 " + pending + " 项改动待生效 · 点此重启 Telegram");
+        bar.setTextSize(14);
+        bar.setTextColor(0xFFFFFFFF);
+        bar.setGravity(Gravity.CENTER);
+        bar.setPadding(dp(14), dp(12), dp(14), dp(12));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(accentColor);
+        bg.setCornerRadius(dp(14));
+        bar.setBackground(bg);
+        bar.setOnClickListener(v -> {
+            bar.setText("正在重启 Telegram…");
+            new Thread(() -> {
+                boolean ok = RootConfig.restartHost();
+                runOnUiThread(() -> {
+                    pending = 0;
+                    Toast.makeText(this, ok ? "已重启 Telegram" : "没找到运行中的客户端",
+                            Toast.LENGTH_SHORT).show();
+                    render();
+                });
+            }).start();
+        });
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(8);
+        root.addView(bar, params);
+    }
+
+    private String valueOr(String key, String fallback) {
+        String value = remote.get(key);
+        return value == null || value.trim().isEmpty() ? fallback : value;
+    }
+
+    /** 后台写 Telegram 的 prefs，写完提示需要重启。 */
+    private void saveRemote(String key, String type, String value) {
+        new Thread(() -> {
+            boolean ok = RootConfig.writeValue(key, type, value);
+            runOnUiThread(() -> {
+                if (ok) {
+                    pending++;
+                    render();
+                } else {
+                    Toast.makeText(this, "写入失败，检查 root 权限", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
+    }
+
+    private void editRemote(String key, String title, String hint) {
+        EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setHint(hint);
+        input.setText(remote.get(key) == null ? "" : remote.get(key));
+        input.setSelection(input.getText().length());
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setView(input)
+                .setPositiveButton("保存", (d, w) -> {
+                    String value = input.getText().toString();
+                    remote.put(key, value);
+                    saveRemote(key, "string", value);
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
     private int gapValue() {
         String raw = remote.get(Keys.gap());
         try { return raw == null ? prefs.getInt(Keys.gap(), 30) : Integer.parseInt(raw.trim()); }
@@ -295,6 +375,8 @@ public class SettingsHomeActivity extends Activity {
             new TimePickerDialog(this, (v2, eh, em) -> {
                 String window = String.format(java.util.Locale.US, "%02d:%02d-%02d:%02d", sh, sm, eh, em);
                 prefs.edit().putString(Keys.window(), window).commit();
+                saveRemote(Keys.window(), "string", window);
+remote.put(Keys.window(), window);
                 notifyTelegram();
                 render();
             }, end[2], end[3], true).show();
@@ -316,6 +398,8 @@ public class SettingsHomeActivity extends Activity {
                         value = Math.max(0, Math.min(3600, Integer.parseInt(input.getText().toString().trim())));
                     } catch (Throwable ignored) {}
                     prefs.edit().putInt(Keys.gap(), value).commit();
+                    saveRemote(Keys.gap(), "int", String.valueOf(value));
+remote.put(Keys.gap(), String.valueOf(value));
                     notifyTelegram();
                     render();
                 })
@@ -327,6 +411,8 @@ public class SettingsHomeActivity extends Activity {
         int minutes = prefs.getInt(Keys.missDeadline(), 23 * 60);
         new TimePickerDialog(this, (view, h, m) -> {
             prefs.edit().putInt(Keys.missDeadline(), h * 60 + m).commit();
+            saveRemote(Keys.missDeadline(), "int", String.valueOf(h * 60 + m));
+remote.put(Keys.missDeadline(), String.valueOf(h * 60 + m));
             notifyTelegram();
             render();
         }, minutes / 60, minutes % 60, true).show();

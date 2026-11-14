@@ -150,6 +150,108 @@ public final class RootConfig {
         return null;
     }
 
+    /**
+     * 写一个配置项到 Telegram 的 prefs。
+     *
+     * 步骤：读原文件 → 替换/插入 → su 写回 → 恢复属主（否则 Telegram 读不了自己的配置）。
+     * 写之前会在同目录留一份 .bak，出问题能还原。
+     *
+     * 返回 true 只代表写进磁盘了，宿主还需要重启才会读到新值。
+     */
+    public static boolean writeValue(String key, String type, String value) {
+        for (String pkg : CLIENTS) {
+            String pids = exec("pidof " + pkg);
+            if (pids == null || pids.trim().isEmpty()) continue;
+            String pid = pids.trim().split("\\s+")[0];
+            String base = "/proc/" + pid + "/root/data/data/" + pkg + "/shared_prefs/" + PREFS;
+            String xml = exec("cat " + base);
+            if (xml == null || !xml.contains("<map>")) continue;
+            String updated = patch(xml, key, type, value);
+            if (updated == null) return false;
+            String owner = exec("stat -c %u:%g " + base).trim();
+            if (owner.isEmpty() || !owner.contains(":")) owner = "1000:1000";
+            exec("cp -f " + base + " " + base + ".bak");
+            boolean ok = write(base, updated, owner);
+            android.util.Log.i("RootConfig", "write " + key + "=" + value + " ok=" + ok + " owner=" + owner);
+            return ok;
+        }
+        return false;
+    }
+
+    /** 在 XML 里替换或插入一个键，保持 SharedPreferences 的格式。 */
+    private static String patch(String xml, String key, String type, String value) {
+        String quoted = Pattern.quote(key);
+        String escaped = escape(value);
+        try {
+            switch (type) {
+                case "boolean": {
+                    String existing = "<boolean name=\"" + quoted + "\" value=\"(true|false)\"";
+                    if (Pattern.compile(existing).matcher(xml).find())
+                        return xml.replaceAll(existing, "<boolean name=\"" + key + "\" value=\"" + value + "\"");
+                    break;
+                }
+                case "int": {
+                    String existing = "<int name=\"" + quoted + "\" value=\"-?\\d+\"";
+                    if (Pattern.compile(existing).matcher(xml).find())
+                        return xml.replaceAll(existing, "<int name=\"" + key + "\" value=\"" + value + "\"");
+                    break;
+                }
+                default: {
+                    String existing = "<string name=\"" + quoted + "\">[^<]*</string>";
+                    if (Pattern.compile(existing).matcher(xml).find())
+                        return xml.replaceAll(existing, "<string name=\"" + key + "\">" + escaped + "</string>");
+                    break;
+                }
+            }
+            // 不存在则插入到 </map> 之前
+            String entry = "boolean".equals(type)
+                    ? "    <boolean name=\"" + key + "\" value=\"" + value + "\" />\n"
+                    : "int".equals(type)
+                    ? "    <int name=\"" + key + "\" value=\"" + value + "\" />\n"
+                    : "    <string name=\"" + key + "\">" + escaped + "</string>\n";
+            int end = xml.lastIndexOf("</map>");
+            if (end < 0) return null;
+            return xml.substring(0, end) + entry + xml.substring(end);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static String escape(String value) {
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+    }
+
+    /** 用 su 把内容写到目标路径，并把属主改回宿主自己的 uid。 */
+    private static boolean write(String path, String content, String owner) {
+        Process process = null;
+        try {
+            process = Runtime.getRuntime().exec(new String[]{"su", "-c",
+                    "cat > " + path + " && chown " + owner + " " + path + " && chmod 660 " + path});
+            java.io.OutputStream out = process.getOutputStream();
+            out.write(content.getBytes("UTF-8"));
+            out.flush();
+            out.close();
+            return process.waitFor() == 0;
+        } catch (Throwable t) {
+            android.util.Log.e("RootConfig", "write 失败: " + t);
+            return false;
+        } finally {
+            if (process != null) process.destroy();
+        }
+    }
+
+    /** 重启宿主，让新配置生效。 */
+    public static boolean restartHost() {
+        for (String pkg : CLIENTS) {
+            String pids = exec("pidof " + pkg);
+            if (pids == null || pids.trim().isEmpty()) continue;
+            exec("am force-stop " + pkg);
+            exec("monkey -p " + pkg + " -c android.intent.category.LAUNCHER 1");
+            return true;
+        }
+        return false;
+    }
+
     private static String exec(String command) {
         Process process = null;
         try {
