@@ -130,9 +130,22 @@ public final class RootConfig {
                 buffer.write(chunk, 0, read);
                 if (System.currentTimeMillis() > deadline) break;
             }
-            process.waitFor();
-            return buffer.toString("UTF-8");
+            int code = process.waitFor();
+            String out = buffer.toString("UTF-8");
+            String err = "";
+            try {
+                InputStream es = process.getErrorStream();
+                ByteArrayOutputStream eb = new ByteArrayOutputStream();
+                byte[] c2 = new byte[2048];
+                int r2;
+                while ((r2 = es.read(c2)) > 0) eb.write(c2, 0, r2);
+                err = eb.toString("UTF-8");
+            } catch (Throwable ignored) {}
+            android.util.Log.i("RootConfig", "exec exit=" + code + " outLen=" + out.length()
+                    + " err=" + err.trim());
+            return out;
         } catch (Throwable t) {
+            android.util.Log.e("RootConfig", "exec 失败: " + t);
             return null;
         } finally {
             if (process != null) process.destroy();
