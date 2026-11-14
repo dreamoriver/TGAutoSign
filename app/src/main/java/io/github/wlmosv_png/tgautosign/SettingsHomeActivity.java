@@ -90,7 +90,7 @@ public class SettingsHomeActivity extends Activity {
                 editRemote("jmb_fail_words", "附加失败词", "多个词用逗号分隔"));
         section("关于");
         valueRow("版本", appVersion() + " · 设置页由独立界面提供", "", null);
-        valueRow("签到目标", "查看每个目标的今日状态", "›", v ->
+        valueRow(Lang.tr("签到目标"), Lang.tr("查看每个目标的今日状态"), "›", v ->
                 startActivity(new Intent(SettingsHomeActivity.this, TargetsActivity.class)));
     }
 
@@ -130,12 +130,12 @@ public class SettingsHomeActivity extends Activity {
         texts.setOrientation(LinearLayout.VERTICAL);
         texts.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView title = new TextView(this);
-        title.setText("签到目标");
+        title.setText(Lang.tr("签到目标"));
         title.setTextSize(16);
         title.setTextColor(textColor);
         texts.addView(title);
         TextView sub = new TextView(this);
-        sub.setText("正在读取…");
+        sub.setText(Lang.tr("正在读取…"));
         sub.setTextSize(12);
         sub.setTextColor(subColor);
         sub.setPadding(0, dp(2), 0, 0);
@@ -274,7 +274,7 @@ public class SettingsHomeActivity extends Activity {
     /** 顶部「待生效」提示条，点一下重启宿主。 */
     private void pendingBar() {
         TextView bar = new TextView(this);
-        bar.setText("有 " + pending + " 项改动待生效 · 点此重启 Telegram");
+        bar.setText(Lang.tr("有 ") + pending + Lang.tr(" 项改动待生效 · 点此重启 Telegram"));
         bar.setTextSize(14);
         bar.setTextColor(0xFFFFFFFF);
         bar.setGravity(Gravity.CENTER);
@@ -284,14 +284,14 @@ public class SettingsHomeActivity extends Activity {
         bg.setCornerRadius(dp(14));
         bar.setBackground(bg);
         bar.setOnClickListener(v -> {
-            bar.setText("正在重启 Telegram…");
+            bar.setText(Lang.tr("正在重启 Telegram…"));
             new Thread(() -> {
                 String pkg = RootConfig.installedClient();
                 boolean pushed = pkg != null && RootConfig.pushPending(pkg, new java.util.ArrayList<>(pendingWrites));
                 boolean ok = pushed && RootConfig.restartHost();
                 runOnUiThread(() -> {
                     if (!ok) {
-                        bar.setText("下发失败，检查 root 权限");
+                        bar.setText(Lang.tr("下发失败，检查 root 权限"));
                         return;
                     }
                     pending = 0;
@@ -326,7 +326,7 @@ public class SettingsHomeActivity extends Activity {
                 if (ok) {
                     Toast.makeText(this, "已下发，几秒内生效", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(this, "下发失败，请先打开一次 Telegram", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, Lang.tr("下发失败，请先打开一次 Telegram"), Toast.LENGTH_SHORT).show();
                 }
             });
         }).start();

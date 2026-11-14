@@ -201,3 +201,42 @@ GitHub Actions（`.github/workflows/build.yml`）：JDK 21 + Android SDK 36 + bu
 - 未识别回复会进「未识别回复池」，由 `LearnPage` 人工确认后写入三级词表（全局 / bot / 目标），没有无监督自适应
 - 1.7.2 上游修过：判定取最强匹配、文档类措辞吞结论、跨天状态泄漏
 - 1.7.2 已支持 bot 编辑消息型回复（`InboundGate` 的 `TL_updateEditMessage`）
+
+## 2026-11-14 14:00 验证码 / 限流：从「判不出」里拆出来
+
+上一版遗留的「验证码 / FLOOD_WAIT 结果码」已做完。改动集中在 SignLogic，
+Core 只做处置，不在四条回复路径上各写一套判据。
+
+### 两个新归类
+
+| 码 | 标识串 | 含义 | 处置 |
+|---|---|---|---|
+| `R_NEED_VERIFY` (7) | `need_verify` | bot 要验证码 / 人机校验 | 停手等人，`needsAttention=true`、`autoRetryable=false` |
+| `R_RATE_LIMITED` (8) | `rate_limited` | bot 侧限流 | 写 10 分钟退避，`autoRetryable=true`，**不计失败** |
+
+### 判据（SignLogic.assistCodeOf）
+
+- 词表 `VERIFY_WORDS` / `RATE_LIMIT_WORDS`；刻意不收裸「验证」「稍后再试」——
+  后者是普通失败语，收进来会把失败改判成限流。
+- 三条守卫：面板形态不算（帮助页里的「输入验证码」是功能入口）、否定句不算
+  （「无需验证」）、验证优先于限流。
+- `refineByAssist` 是**唯一允许覆盖判定链的入口**，并且只在原结论不是
+  `V_SIGNED` / `V_EXHAUSTED` 时生效 —— 成功绝不被推翻（有专门单测）。
+
+### 接线方式
+
+`judgeWithScopesStage` 统一后置精炼，四个判定入口（就地对答 / 规则测试器 /
+handleReplyText / 长消息链）一次覆盖，不必各写一遍。
+
+界面侧：`PS_NEED_VERIFY` / `PS_RATE_LIMIT` → `RS_VERIFY` / `RS_RATE_LIMIT`，
+statusOf、attentionHint、attentionLabel、roundProblemsOf、统计页原因都单列；
+`SignStateStore.hasEvidenceResult` 也加了这两码，防止被无证据的超时扫描覆盖。
+
+### 验证
+
+- 新增 `tools/tests/AssistVerdictTest.java`（37 条）已接进 build.sh 判定测试组
+- 判定测试组 582 条全过（SignLogicTest 741 条另计）
+- 全量 javac：android-36 + libxposed api 102 编译通过
+- 门禁：i18n / 测试接线 / 待处理状态机 / 孤儿键 / 判不出升级 / last_write / wiring 全绿
+- 顺手补了 TargetsActivity、SettingsHomeActivity 的裸中文，`check-ui-i18n` 从
+  14 条缺失变 765/765 全绿（此前那些文案在英文设备上一直显示中文）

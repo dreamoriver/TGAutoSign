@@ -1679,6 +1679,8 @@ public final class TGAutoSignCore {
             case RS_SENDFAIL: return Lang.tr("发送失败");
             case RS_PANEL:    return Lang.tr("面板过期");
             case RS_UNCONFIRMED: return Lang.tr("未确定");
+            case RS_VERIFY:      return Lang.tr("要验证码");
+            case RS_RATE_LIMIT:  return Lang.tr("限流等待");
             default:          return Lang.tr("已跳过");
         }
     }
@@ -5751,6 +5753,8 @@ public final class TGAutoSignCore {
                     int rc2 = -1;
                     try { rc2 = stateStore.resultOf(prefix, entryId(m)); } catch (Throwable ignored) {}
                     String why = rc2 == SignLogic.R_FAILED ? Lang.tr("判为失败")
+                            : rc2 == SignLogic.R_NEED_VERIFY ? Lang.tr("要验证码")
+                            : rc2 == SignLogic.R_RATE_LIMITED ? Lang.tr("限流等待")
                             : rc2 == SignLogic.R_REPLIED_UNK ? Lang.tr("回复认不出")
                             : rc2 == SignLogic.R_NO_REPLY ? Lang.tr("bot 没回")
                             : rc2 == SignLogic.R_BTN_STALE ? Lang.tr("按钮失效") : Lang.tr("待确认");
@@ -6187,6 +6191,7 @@ public final class TGAutoSignCore {
                     < prefs.getLong(kRetryAt(_pp, _eid0), 0L);
             boolean _needsAction = isPendingConfirm(_pp, _eid0)
                     || _rc0 == SignLogic.R_FAILED
+                    || _rc0 == SignLogic.R_NEED_VERIFY
                     || _rc0 == SignLogic.R_BTN_STALE
                     || _rc0 == SignLogic.R_NO_REPLY
                     || _rc0 == SignLogic.R_REPLIED_UNK
@@ -7315,6 +7320,19 @@ public final class TGAutoSignCore {
                 case SignLogic.R_REPLIED_UNK:
                     clearNoReplyStreak(prefix, id);
                     roundMark(prefix, id, RS_UNKNOWN, "回复认不出，可补判定词"); break;
+                case SignLogic.R_NEED_VERIFY:
+                    // 等人：把退避清掉（留着会让界面显示"退避中"，与实际原因不符），
+                    // 并且不写 retry —— autoRetryable 已把这一码排除在自动重试之外。
+                    clearNoReplyStreak(prefix, id);
+                    prefs.edit().remove(kRetryAt(prefix, id)).apply();
+                    roundMark(prefix, id, RS_VERIFY, "需要验证码 / 人机校验，已停手等人"); break;
+                case SignLogic.R_RATE_LIMITED:
+                    // 限流：按 10 分钟退避。真实秒数由发送链的 FLOOD_WAIT 分支精确覆盖，
+                    // 这里只是"回复里说自己被限流"的兜底时长。
+                    prefs.edit()
+                         .putLong(kRetryAt(prefix, id), System.currentTimeMillis() + 10L * 60 * 1000)
+                         .putString(kRetryDay(prefix, id), todayStr()).apply();
+                    roundMark(prefix, id, RS_RATE_LIMIT, "被限流，稍后自动重试"); break;
                 case SignLogic.R_NO_REPLY: {
                     // ── 2026-10-14：「bot 从不应答」单列 ──
                     // 有些目标本来就是查询类/菜单类 bot（发过去不会有文字回复），
@@ -8404,6 +8422,16 @@ public final class TGAutoSignCore {
                                         markSigned(fPrefix, fId);
                                         logs("【就地对答】" + fId + " 返回命中「" + _hit + "」→ 计入已签: " + clip(ans, 40));
                                         noteResult(fAccount, true);
+                                    } else if (_v == SignLogic.V_NEED_VERIFY
+                                            || _v == SignLogic.V_RATE_LIMITED) {
+                                        // 就地对答里出现验证/限流：同样要落归类，否则界面只会说"判不出"。
+                                        boolean _nv = _v == SignLogic.V_NEED_VERIFY;
+                                        markResultCode(fPrefix, fId, _nv ? SignLogic.R_NEED_VERIFY
+                                                                        : SignLogic.R_RATE_LIMITED);
+                                        logw("【就地对答】" + fId + (_nv
+                                                ? " 要求人工验证 → 停手等人: "
+                                                : " 被限流 → 稍后自动重试: ") + clip(ans, 40));
+                                        noteResult(fAccount, false);
                                     } else if (_v == SignLogic.V_FAILED) {
                                         prefs.edit().remove(kLast(fPrefix, fId))
                                              .putInt(kRetry(fPrefix, fId), Math.min(
@@ -8695,6 +8723,11 @@ public final class TGAutoSignCore {
     // 为什么必须有它：过去把「什么都没观察到」直接说成「未回复」，而"未回复"是对 bot
     // 行为的**断言**，需要证据；证据不足只能说"未确定"。
     static final int RS_UNCONFIRMED = 8;
+    // 2026-11-14：这两个不是"判不出"，是两种**能说清**的异常。
+    //   需要验证 = 等人（重发无用，越刷越难过）
+    //   被限流   = 等一会儿（模块自己退避，不该让用户看到"失败"）
+    static final int RS_VERIFY      = 9;
+    static final int RS_RATE_LIMIT  = 10;
 
     /** 单条实时状态。 */
     static final class RoundState {
@@ -8801,6 +8834,12 @@ public final class TGAutoSignCore {
                     case SignLogic.PS_PANEL:
                         state = RS_PANEL;
                         note = Lang.tr("等不到带按钮的新消息：在条目「编辑」里填一条前置命令（如 /menu）"); break;
+                    case SignLogic.PS_NEED_VERIFY:
+                        state = RS_VERIFY;
+                        note = Lang.tr("bot 要求验证码 / 人机校验 —— 需要你在会话里手动过验证，模块已停手"); break;
+                    case SignLogic.PS_RATE_LIMIT:
+                        state = RS_RATE_LIMIT;
+                        note = Lang.tr("bot 侧限流 —— 模块会在退避后自动重试，不需要你操作"); break;
                     case SignLogic.PS_SENT:
                         // 2026-11-08 回归修复：窗口内"等回复"**不进**「卡住的目标」列表。
                         // 1.7.5 里把它显式设成 RS_SENT(1)，而列表筛除只认 state<0，
@@ -8855,7 +8894,8 @@ public final class TGAutoSignCore {
         for (RoundState rs : roundStates.values()) {
             if (!prefix.equals(rs.prefix)) continue;
             if (rs.state == RS_NO_REPLY || rs.state == RS_UNKNOWN
-                    || rs.state == RS_SENDFAIL || rs.state == RS_PANEL) {
+                    || rs.state == RS_SENDFAIL || rs.state == RS_PANEL
+                    || rs.state == RS_VERIFY) {
                 RoundState cur = map.get(rs.id);
                 if (cur == null) { map.put(rs.id, rs); }
                 else { cur.state = rs.state; if (rs.note != null && rs.note.length() > 0) cur.note = rs.note; }
@@ -8877,7 +8917,8 @@ public final class TGAutoSignCore {
             total++;
             if (rs.state == RS_SIGNED) { done++; signed++; }
             else if (rs.state == RS_NO_REPLY || rs.state == RS_UNKNOWN
-                     || rs.state == RS_SENDFAIL || rs.state == RS_PANEL) { done++; problem++; }
+                     || rs.state == RS_SENDFAIL || rs.state == RS_PANEL
+                     || rs.state == RS_VERIFY) { done++; problem++; }
         }
         return new int[]{done, total, signed, problem};
     }
@@ -9506,6 +9547,9 @@ public final class TGAutoSignCore {
         if (_rc == SignLogic.R_REPLIED_UNK) return Lang.tr("回复判不出");
         if (_rc == SignLogic.R_NO_REPLY)    return Lang.tr("bot 未回复");
         if (_rc == SignLogic.R_JUDGE_OFF)   return Lang.tr("判定已关（去设置打开）");
+        // 2026-11-14：验证/限流单列，别再让它们混进「回复判不出」。
+        if (_rc == SignLogic.R_NEED_VERIFY)  return Lang.tr("需要验证");
+        if (_rc == SignLogic.R_RATE_LIMITED) return Lang.tr("限流等待");
         // 2026-10-08：V_EXHAUSTED 已改判为「签到成功」，状态栏也要跟着改，
         // 否则用户看到「今日已用尽」会以为没签上，又去手动点。
         if (_rc == SignLogic.R_EXHAUSTED)   return Lang.tr("今日已签");
@@ -16888,6 +16932,8 @@ public final class TGAutoSignCore {
         if (rc == SignLogic.R_NO_REPLY)     return Lang.tr("bot 全程没回复");
         if (rc == SignLogic.R_JUDGE_OFF)    return Lang.tr("自动判定已关闭，未判成败");
         if (rc == SignLogic.R_EXHAUSTED)    return Lang.tr("机器人说今日次数已用尽（通常表示今天已经签过了）");
+        if (rc == SignLogic.R_NEED_VERIFY)  return Lang.tr("bot 要求验证码或人机校验：请在会话里手动完成验证，模块已停止自动重发");
+        if (rc == SignLogic.R_RATE_LIMITED) return Lang.tr("bot 侧限流：模块会在退避后自动重试，不需要你操作");
         return Lang.tr("结果未知，需要你看一眼");
     }
 
@@ -16901,6 +16947,8 @@ public final class TGAutoSignCore {
         if (rc == SignLogic.R_NO_REPLY)     return Lang.tr("bot 未回复");
         if (rc == SignLogic.R_JUDGE_OFF)    return Lang.tr("判定已关");
         if (rc == SignLogic.R_EXHAUSTED)    return Lang.tr("今日已签");
+        if (rc == SignLogic.R_NEED_VERIFY)  return Lang.tr("需要验证");
+        if (rc == SignLogic.R_RATE_LIMITED) return Lang.tr("限流等待");
         return Lang.tr("结果未知");
     }
 
@@ -17746,6 +17794,10 @@ public final class TGAutoSignCore {
                         hit, customHit ? Lang.tr("（你的自定义词）") : ""), hit, "err"};
             if (v == SignLogic.V_EXHAUSTED)
                 return new String[]{Lang.tf("命中「{0}」-> 判定：今日已用尽（不再重发）", hit), hit, "info"};
+            if (v == SignLogic.V_NEED_VERIFY)
+                return new String[]{Lang.tr("判定：需要人工验证（验证码 / 人机校验）-> 已停手，等你处理"), hit, "warn"};
+            if (v == SignLogic.V_RATE_LIMITED)
+                return new String[]{Lang.tr("判定：被限流 -> 稍后自动重试，不计失败"), hit, "info"};
             return new String[]{Lang.tr("没命中任何词 -> 判定：认不出（会记为「结果未知」等你处置）"), "", "warn"};
         } catch (Throwable t) {
             return new String[]{Lang.tf("测试出错：{0}", String.valueOf(t)), "", "err"};
@@ -21120,7 +21172,12 @@ public final class TGAutoSignCore {
             in.failWords = failAll;
             in.dupWords = null;             // 用内置 DUP
             in.userFailWords = (userFail != null && userFail.length > 0) ? userFail : null;
-            return SignLogic.decideByStage(in);
+            // 2026-11-14：十阶段引擎之后加一道**辅助精炼**。
+            //   为什么加在这里：判定链对"请输入验证码""操作太频繁"只能说不知道，
+            //   而这两句都有明确含义。放在统一入口一次，四个调用点全部生效，
+            //   不必在四条回复路径上各写一遍（那是历史事故的来源）。
+            //   精炼**绝不推翻** V_SIGNED / V_EXHAUSTED（见 refineByAssist）。
+            return SignLogic.refineByAssist(SignLogic.decideByStage(in), reply);
         } catch (Throwable t) {
             noteSwallowed("judgeWithScopesStage", t);
             return new SignLogic.StageResult(SignLogic.V_UNKNOWN, SignLogic.STAGE_NONE, "", "");
@@ -24412,6 +24469,17 @@ public final class TGAutoSignCore {
                     try { evt("verdict", id, did, account, "v=signed hit=" + hit); } catch (Throwable ignored) {}
                     return;
                 }
+                if (v == SignLogic.V_NEED_VERIFY || v == SignLogic.V_RATE_LIMITED) {
+                    boolean _nv = v == SignLogic.V_NEED_VERIFY;
+                    jlog("【回复判定】" + did + (_nv
+                            ? " bot 要求人工验证 → 停手等人，不再自动重发: "
+                            : " bot 侧限流 → 稍后自动重试，不计失败: ") + clip(text, 40));
+                    markResultCode(prefix, id, _nv ? SignLogic.R_NEED_VERIFY
+                                                   : SignLogic.R_RATE_LIMITED);
+                    try { evt("verdict", id, did, account, _nv ? "v=need_verify" : "v=rate_limited"); }
+                    catch (Throwable ignored) {}
+                    return;
+                }
                 if (v == SignLogic.V_FAILED) {
                     jlog("【回复判定】" + did + " 命中失败词「" + hit + "」→ 判定未成功: " + clip(text, 40));
                     markResultCode(prefix, id, SignLogic.R_FAILED);
@@ -25711,6 +25779,24 @@ public final class TGAutoSignCore {
                             noteResult(ctrlAcc >= 0 ? ctrlAcc : currentAccount(), false);
                             return;
                         }
+                        return;
+                    }
+
+                    // ── 2026-11-14：验证 / 限流 ──
+                    // 放在 V_UNKNOWN 之前：这两句本来会掉进"判不出 → 待确认 → 当天不再重试"，
+                    // 用户看到的理由是"去补判定词"，而补词对验证码毫无意义。
+                    if (verdict == SignLogic.V_NEED_VERIFY || verdict == SignLogic.V_RATE_LIMITED) {
+                        boolean _nv = verdict == SignLogic.V_NEED_VERIFY;
+                        int _arc = _nv ? SignLogic.R_NEED_VERIFY : SignLogic.R_RATE_LIMITED;
+                        for (Map<String, Object> m : judgeTargets) {
+                            if (entryDid(m) != did) continue;
+                            String id = entryId(m);
+                            markResultCode(prefix, id, _arc);
+                        }
+                        logw("【回复判定】" + did + (_nv
+                                ? " bot 要求人工验证 → 已停手，等你在会话里过验证: "
+                                : " bot 侧限流 → 已安排退避重试，不计失败: ") + clip(replyText, 40));
+                        noteResult(ctrlAcc >= 0 ? ctrlAcc : currentAccount(), false);
                         return;
                     }
 

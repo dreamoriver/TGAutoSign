@@ -1160,6 +1160,41 @@ public final class Lang {
         EN.put("填前置命令（让模块自动拉面板）", "Add pre-command (pull the panel automatically)");
         EN.put("目标已不存在", "Target no longer exists");
         EN.put("回复判不出", "Reply unreadable");
+        // 2026-11-14：设置页 / 目标列表原先的裸中文（i18n 门禁欠账）
+        EN.put("刷新", "Refresh");
+        EN.put("正在刷新…", "Refreshing…");
+        EN.put("未命名目标", "Unnamed target");
+        EN.put("目标列表是空的，先在 /jmb 里添加一个。", "Target list is empty - add one in /jmb first.");
+        EN.put("还没有收到目标数据。请先在 Telegram 里打开一次 /jmb，再回来刷新。",
+               "No target data yet. Open /jmb in Telegram once, then refresh.");
+        EN.put("确定删除「", "Delete \"");
+        EN.put("」？这个操作不可撤销。", "\"? This cannot be undone.");
+        EN.put("已下发", "Sent");
+        EN.put("已下发，几秒内生效", "Sent - takes effect in seconds");
+        EN.put("下发失败，请先打开一次 Telegram", "Send failed - open Telegram once first");
+        EN.put("签到目标", "Check-in targets");
+        EN.put("查看每个目标的今日状态", "Today's status per target");
+        EN.put("正在读取…", "Loading…");
+        EN.put("有 ", " ");
+        EN.put(" 项改动待生效 · 点此重启 Telegram", " change(s) pending - tap to restart Telegram");
+        EN.put("正在重启 Telegram…", "Restarting Telegram…");
+        EN.put("下发失败，检查 root 权限", "Send failed - check root permission");
+        // 2026-11-14：验证 / 限流两个新归类
+        EN.put("需要验证", "Verification needed");
+        EN.put("要验证码", "Needs captcha");
+        EN.put("限流等待", "Rate limited");
+        EN.put("bot 要求验证码或人机校验：请在会话里手动完成验证，模块已停止自动重发",
+               "Bot asks for a captcha / human check: finish it in the chat; auto-resend is paused");
+        EN.put("bot 要求验证码 / 人机校验 —— 需要你在会话里手动过验证，模块已停手",
+               "Bot asks for a captcha / human check - pass it in the chat; module has stopped");
+        EN.put("bot 侧限流：模块会在退避后自动重试，不需要你操作",
+               "Bot rate-limited: will retry after backoff, no action needed");
+        EN.put("bot 侧限流 —— 模块会在退避后自动重试，不需要你操作",
+               "Bot rate-limited - will retry after backoff, no action needed");
+        EN.put("判定：需要人工验证（验证码 / 人机校验）-> 已停手，等你处理",
+               "Verdict: manual verification required (captcha) -> stopped, waiting for you");
+        EN.put("判定：被限流 -> 稍后自动重试，不计失败",
+               "Verdict: rate limited -> auto retry later, not counted as failure");
         // 「今日已用尽」——bot 明确表示今天不能再操作（次数上限/请明日再试）。
         // 归入今日了结：不标已签、不计失败、不再重发。
         EN.put("今日已用尽", "Daily quota used up");

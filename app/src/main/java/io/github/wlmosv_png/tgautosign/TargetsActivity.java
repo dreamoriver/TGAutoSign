@@ -171,7 +171,7 @@ public class TargetsActivity extends Activity {
         action.setTextColor(accentColor);
         action.setPadding(dp(10), dp(6), dp(2), dp(6));
         action.setOnClickListener(v -> {
-            action.setText("已下发");
+            action.setText(Lang.tr("已下发"));
             action.setTextColor(subColor);
             sendCommand("sign|" + t.entryId);
         });
@@ -181,7 +181,7 @@ public class TargetsActivity extends Activity {
         row.setOnLongClickListener(v -> {
             new android.app.AlertDialog.Builder(this)
                     .setTitle("删除目标")
-                    .setMessage("确定删除「" + t.title + "」？这个操作不可撤销。")
+                    .setMessage(Lang.tr("确定删除「") + t.title + Lang.tr("」？这个操作不可撤销。"))
                     .setPositiveButton("删除", (d, w) -> sendCommand("del|" + t.entryId))
                     .setNegativeButton("取消", null)
                     .show();
@@ -196,7 +196,7 @@ public class TargetsActivity extends Activity {
             String pkg = RootConfig.installedClient();
             boolean ok = pkg != null && RootConfig.pushCommand(pkg, line);
             runOnUiThread(() -> Toast.makeText(this,
-                    ok ? "已下发，几秒内生效" : "下发失败，请先打开一次 Telegram",
+                    ok ? Lang.tr("已下发，几秒内生效") : Lang.tr("下发失败，请先打开一次 Telegram"),
                     Toast.LENGTH_SHORT).show());
         }).start();
     }
@@ -207,7 +207,7 @@ public class TargetsActivity extends Activity {
         long at = prefs.getLong("targets_at", 0L);
         String account = prefs.getString("targets_account", "0");
         if (json == null) {
-            render(null, "还没有收到目标数据。请先在 Telegram 里打开一次 /jmb，再回来刷新。");
+            render(null, Lang.tr("还没有收到目标数据。请先在 Telegram 里打开一次 /jmb，再回来刷新。"));
             return;
         }
         try {
@@ -237,19 +237,19 @@ public class TargetsActivity extends Activity {
         root.addView(statusLine);
 
         TextView refresh = new TextView(this);
-        refresh.setText("刷新");
+        refresh.setText(Lang.tr("刷新"));
         refresh.setTextSize(14);
         refresh.setTextColor(0xFF2563EB);
         refresh.setPadding(dp(6), dp(6), dp(6), dp(14));
         refresh.setOnClickListener(v -> {
-            statusLine.setText("正在刷新…");
+            statusLine.setText(Lang.tr("正在刷新…"));
             loadFromRoot(false);
         });
         root.addView(refresh);
 
         if (targets == null || targets.length() == 0) {
             TextView empty = new TextView(this);
-            empty.setText(targets == null ? "" : "目标列表是空的，先在 /jmb 里添加一个。");
+            empty.setText(targets == null ? "" : Lang.tr("目标列表是空的，先在 /jmb 里添加一个。"));
             empty.setTextSize(14);
             empty.setTextColor(subColor);
             empty.setPadding(dp(6), dp(4), dp(6), dp(4));
@@ -283,7 +283,7 @@ public class TargetsActivity extends Activity {
         texts.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
 
         TextView name = new TextView(this);
-        name.setText(o.optString("title", o.optString("cmd", "未命名目标")));
+        name.setText(o.optString("title", o.optString("cmd", Lang.tr("未命名目标"))));
         name.setTextSize(16);
         name.setTextColor(textColor);
         texts.addView(name);

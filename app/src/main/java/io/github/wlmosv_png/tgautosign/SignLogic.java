@@ -537,6 +537,13 @@ public final class SignLogic {
      * 单独一类，界面显示「今日已了结」，语义准确。
      */
     public static final int V_EXHAUSTED = 3;
+    /**
+     * 需要人工验证（2026-11-14）。与 V_FAILED 分开，处置入口不同：
+     * 失败可以自动重试，验证码只能等人。
+     */
+    public static final int V_NEED_VERIFY = 4;
+    /** 被 bot 侧限流（2026-11-14）：按退避重试，不计失败。 */
+    public static final int V_RATE_LIMITED = 5;
 
     // ════════════════════════════════════════════════════════════════
     //  声明式判定阶段表（M2，2026-11-01）
@@ -579,6 +586,9 @@ public final class SignLogic {
     public static final int STAGE_SUCCESS        = 7;
     public static final int STAGE_COMBO          = 8;
     public static final int STAGE_NONE           = 9;
+    /** 辅助结论（2026-11-14）：不在十阶段之内，由 refineByAssist 后置标注。 */
+    public static final int STAGE_VERIFY         = 10;
+    public static final int STAGE_RATE_LIMIT     = 11;
 
     /** 判断命中词是否属于 PERMANENT_FAIL 表（用于 S0 与 S2 的去重）。 */
     private static boolean inPermanentFailSet(String w) {
@@ -601,6 +611,8 @@ public final class SignLogic {
             case STAGE_DUP:            return "DUP";
             case STAGE_SUCCESS:        return "SUCCESS";
             case STAGE_COMBO:          return "COMBO";
+            case STAGE_VERIFY:         return "VERIFY";
+            case STAGE_RATE_LIMIT:     return "RATE_LIMIT";
             default:                   return "NONE";
         }
     }
@@ -1565,6 +1577,79 @@ public final class SignLogic {
     //    因此只收录「几乎不可能出现在签到按钮上」的词。
     // ════════════════════════════════════════════════════════════════
 
+
+    // ═══════════════════════════════════════════════════════════════
+    //  辅助结论：需要验证 / 被限流（2026-11-14）
+    //
+    //  这两类文本的共同点：**判定链只能说「不知道」**。
+    //  但用户真正需要知道的不是「不知道」，而是「这条要不要我动手」。
+    //  所以单独给两个归类，并且**只在原结论不是成功/额度用尽时生效** ——
+    //  任何情况下都不推翻「已签」。
+    // ═══════════════════════════════════════════════════════════════
+
+    /** 要求人工验证的说法（小写比对）。只收「明确要求你验证」的形态，不收裸「验证」二字。 */
+    public static final String[] VERIFY_WORDS = {
+            "请输入验证码", "输入验证码", "验证码", "人机验证", "安全验证", "滑块验证",
+            "点击验证", "完成验证", "验证后", "请先验证", "需要验证",
+            "captcha", "not a robot", "verify you are human", "verification code"
+    };
+
+    /** 频率限制说法。刻意不收「稍后再试」—— 那是普通失败语，收进来会把失败改判成限流。 */
+    public static final String[] RATE_LIMIT_WORDS = {
+            "操作太频繁", "操作过于频繁", "操作频繁", "请求过于频繁", "请求太频繁",
+            "请求频繁", "发送太频繁", "发送过于频繁", "发言太频繁", "操作过快",
+            "过于频繁", "请慢一点", "限流", "flood_wait", "too many requests", "rate limit"
+    };
+
+    /**
+     * 辅助结论判定（纯函数）。
+     *
+     * @return R_NEED_VERIFY / R_RATE_LIMITED，都不命中返回 -1
+     *
+     * 判据（任一不满足即不成立，宁可漏判也不误判）：
+     *   ① 文本不是面板/菜单形态 —— 「输入验证码」出现在帮助页里是功能入口，不是当前要求；
+     *   ② 命中词未被否定 —— 「无需验证」不算；
+     *   ③ 验证类优先于限流类 —— 「操作太频繁，请完成验证」真正卡住的是验证。
+     */
+    public static int assistCodeOf(String reply) {
+        if (reply == null) return -1;
+        String lower = reply.toLowerCase();
+        if (lower.trim().length() == 0) return -1;
+        String flat = stripSpace(lower);
+        try {
+            if (isPanelLike(flat)) return -1;
+        } catch (Throwable t) { return -1; }
+
+        String mv = matched(lower, VERIFY_WORDS);
+        if (mv != null && !negated(lower, mv)) return R_NEED_VERIFY;
+        String mr = matched(lower, RATE_LIMIT_WORDS);
+        if (mr != null && !negated(lower, mr)) return R_RATE_LIMITED;
+        return -1;
+    }
+
+    /**
+     * 用辅助结论精炼判定结果。**唯一允许覆盖判定链输出的入口**。
+     *
+     * 只覆盖「不是结论」的情况：
+     *   · V_SIGNED / V_EXHAUSTED → 原样返回（成功绝不被推翻）
+     *   · 其余（V_UNKNOWN / V_FAILED）→ 命中验证或限流时换成对应码
+     *     为什么连 V_FAILED 也覆盖：「签到失败，请先完成人机验证」里失败词先命中，
+     *     但用户能做的只有去验证，判成失败只会让模块无脑重发。
+     */
+    public static StageResult refineByAssist(StageResult base, String reply) {
+        if (base == null) {
+            return new StageResult(V_UNKNOWN, STAGE_NONE, "", reply == null ? "" : reply);
+        }
+        if (base.verdict == V_SIGNED || base.verdict == V_EXHAUSTED) return base;
+        int c = assistCodeOf(reply);
+        if (c == R_NEED_VERIFY) {
+            return new StageResult(V_NEED_VERIFY, STAGE_VERIFY, base.hitWord, base.clause);
+        }
+        if (c == R_RATE_LIMITED) {
+            return new StageResult(V_RATE_LIMITED, STAGE_RATE_LIMIT, base.hitWord, base.clause);
+        }
+        return base;
+    }
 
     public static int verdictOf(String reply, String[] dup, String[] ok, String[] fail) {
         return (Integer) verdictDetail(reply, dup, ok, fail)[0];
@@ -3269,6 +3354,21 @@ public final class SignLogic {
      * 今天不必再管，但**不代表签到成功** —— 界面要说清，别让用户误以为签上了。
      */
     public static final int R_EXHAUSTED     = 6;
+    /**
+     * 需要人工验证（2026-11-14 新增）：bot 要求输入验证码 / 过人机校验 / 点滑块。
+     *
+     * 为什么单列：这类回复在旧实现里落 R_REPLIED_UNK（「判不出」），界面只会提示
+     * 「去补判定词」—— 而补词永远解决不了验证码。它需要的是**人**，不是词表。
+     * 同时必须停止自动重发：越刷越不可能过验证，还可能被 bot 侧风控。
+     */
+    public static final int R_NEED_VERIFY  = 7;
+    /**
+     * 被限流（2026-11-14 新增）：bot 侧说「操作太频繁 / 请求过于频繁 / 请慢一点」。
+     *
+     * 与 R_FAILED 的区别：这不是失败，是**服务器让你等**。记成失败会消耗当天的
+     * 失败熔断额度，用户第二天看到「已放弃」却不知道为什么。它应当按退避重试。
+     */
+    public static final int R_RATE_LIMITED = 8;
 
     /** 归类的稳定标识串（存进 pendcfm_note_，跨版本可读）。 */
     public static String resultCode(int r) {
@@ -3280,6 +3380,8 @@ public final class SignLogic {
             case R_NO_REPLY:    return "no_reply";
             case R_JUDGE_OFF:   return "judge_off";
             case R_EXHAUSTED:   return "exhausted";
+            case R_NEED_VERIFY: return "need_verify";
+            case R_RATE_LIMITED: return "rate_limited";
             default:            return "unknown";
         }
     }
@@ -3301,6 +3403,10 @@ public final class SignLogic {
             // 由阶段 2 的持久化测试 F2b 实测抓到（写入后读回得到 -1，期望 R_EXHAUSTED）。
             // 不变式：resultCode 与 resultOfCode 必须**互为逆映射**，新增码必须同时加两处。
             case "exhausted":       return R_EXHAUSTED;
+            // 2026-11-14：新增码必须同时出现在 resultCode 与这里，
+            // 否则往返不闭合（历史事故：exhausted 缺分支 → 读回 -1 → 界面丢归类）。
+            case "need_verify":     return R_NEED_VERIFY;
+            case "rate_limited":    return R_RATE_LIMITED;
             default:                return -1;
         }
     }
@@ -3339,6 +3445,10 @@ public final class SignLogic {
     public static final int PS_PANEL       = 6;   // 面板过期
     public static final int PS_SKIPPED     = 7;   // 已跳过
     public static final int PS_UNCONFIRMED = 8;   // **证据不足 / 未确定**（修复新增）
+    /** 需要人工验证（2026-11-14）：横幅应说「要验证码」，不是「判不出」。 */
+    public static final int PS_NEED_VERIFY = 9;
+    /** 被限流（2026-11-14）：显示「稍后重试」，不进「需处理」。 */
+    public static final int PS_RATE_LIMIT  = 10;
 
     /** 距发出多久之后，"仍在等"要显示为"未确定"（只影响措辞，绝不用于判定未回复）。 */
     public static final long UNCONFIRMED_AFTER_MS = 90L * 1000L;
@@ -3370,6 +3480,9 @@ public final class SignLogic {
         }
         if (rc == R_FAILED) return PS_SENDFAIL;
         if (rc == R_BTN_STALE) return PS_PANEL;
+        // 2026-11-14：辅助类归类同样是「明确归类」，必须先于 pendcfm_ 布尔与证据等级。
+        if (rc == R_NEED_VERIFY) return PS_NEED_VERIFY;
+        if (rc == R_RATE_LIMITED) return PS_RATE_LIMIT;
         if (pendingConfirm) return PS_UNKNOWN;
         // ① 先看证据：有回复证据（含判不出）→ 永远不会被判成"未回复"
         if (grade >= GRADE_SEEN || rc == R_REPLIED_UNK) return PS_UNKNOWN;
@@ -3530,15 +3643,19 @@ public final class SignLogic {
 
     /** 该归类是否需要用户处置（界面据此决定是否进「待处理」聚合条）。 */
     public static boolean needsAttention(int r) {
-        return r == R_BTN_STALE || r == R_REPLIED_UNK || r == R_NO_REPLY || r == R_JUDGE_OFF;
+        return r == R_BTN_STALE || r == R_REPLIED_UNK || r == R_NO_REPLY || r == R_JUDGE_OFF
+                || r == R_NEED_VERIFY;
+        // R_RATE_LIMITED 刻意不进「待处理」：那是服务器让等，模块自己会退避重试，
+        // 让人去点「重试」只会更快撞上限流（与 R_FAILED 的处理口径一致）。
     }
 
     /** 该归类是否允许自动重试（false = 停止重试，等人）。 */
     public static boolean autoRetryable(int r) {
         switch (r) {
-            case R_FAILED:    return true;    // 失败按退避重试
-            case R_BTN_STALE: return true;    // 等新面板后可重试
-            default:          return false;   // 其余一律停手
+            case R_FAILED:       return true;    // 失败按退避重试
+            case R_BTN_STALE:    return true;    // 等新面板后可重试
+            case R_RATE_LIMITED: return true;    // 限流 = 等一会儿再来，必须退避
+            default:             return false;   // 其余一律停手（含需要验证：等人）
         }
     }
 

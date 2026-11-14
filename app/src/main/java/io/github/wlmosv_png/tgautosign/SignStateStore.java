@@ -538,7 +538,10 @@ public final class SignStateStore {
     /** 该归类是否属于「有证据」类（不得被无证据的超时结论覆盖）。 */
     private static boolean hasEvidenceResult(int r) {
         return r == SignLogic.R_SIGNED || r == SignLogic.R_FAILED
-                || r == SignLogic.R_REPLIED_UNK || r == SignLogic.R_BTN_STALE;
+                || r == SignLogic.R_REPLIED_UNK || r == SignLogic.R_BTN_STALE
+                // 2026-11-14：验证/限流也是**有回复证据**的归类，
+                // 不能被"超时无结论"的扫描覆盖成 bot 未回复。
+                || r == SignLogic.R_NEED_VERIFY || r == SignLogic.R_RATE_LIMITED;
     }
 
     /** 今天 bot 是否回过内容（含就地对答与消息回复两条路径）。 */
